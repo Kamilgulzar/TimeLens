@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # TimeLens
 
 Productivity intelligence platform that helps you understand how you spend your time.
