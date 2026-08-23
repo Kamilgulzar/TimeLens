@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String      @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String      @unique
+  password    String?     // Nullable for Google OAuth users
+  provider    String      @default("local") // local, google, github
+  providerId  String?     @unique
+  avatar      String?
+  emailVerifiedAt DateTime?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  activities  Activity[]
+  goals       Goal[]
+  categoryOverrides CategoryOverride[]
+  extensionStatus   ExtensionStatus?
+  extensionControl  ExtensionControl?
+}
+
+model ExtensionStatus {
+  userId          String    @id
+  connected       Boolean   @default(false)
+  trackingEnabled Boolean   @default(false)
+  browser         String    @default("Chrome")
+  version         String?
+  lastSeenAt      DateTime?
+  lastSyncedAt    DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ExtensionControl {
+  userId           String    @id
+  trackingEnabled  Boolean?  // null = no pending change
+  disconnect       Boolean   @default(false)
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Activity {
+  id           String    @id @default(cuid())
+
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  application  String    // Normalized website/domain (github.com) or app name
+  title        String?   // Optional, e.g. a page title
+  category     String    // Development, Learning, Social...
+  source       String    // desktop | browser
+  clientEventId String?  // Idempotency key supplied by the tracking client
+
+  startTime    DateTime
+  endTime      DateTime
+  duration     Int       // Store duration in seconds
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, clientEventId])
+  @@index([userId, startTime])
+}
+
+model Goal {
+  id             String    @id @default(cuid())
+
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category       String
+  targetMinutes  Int
+  period         String    // daily, weekly, monthly
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model CategoryOverride {
+  userId    String
+  website   String   // normalized domain
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, website])
+}

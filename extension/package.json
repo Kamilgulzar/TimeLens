@@ -1,0 +1,19 @@
+{
+  "name": "timelens-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TimeLens browser extension - the activity tracking component of TimeLens.",
+  "scripts": {
+    "build": "tsc -p . && node scripts/copy.mjs",
+    "package": "node scripts/package.mjs",
+    "watch": "tsc -p . --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "node scripts/session-math-test.mjs && node scripts/wiring-test.mjs",
+    "clean": "node scripts/copy.mjs --clean"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "typescript": "^5.6.3"
+  }
+}

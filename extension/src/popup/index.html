@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TimeLens</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <img class="brand-mark" src="../icons/icon128.png" alt="" />
+        <span class="brand-name">TimeLens</span>
+      </div>
+      <span class="status-pill" id="status-pill" data-state="off">Not signed in</span>
+    </header>
+
+    <main>
+      <section class="view" id="view-connect" hidden>
+        <div class="connect-head">
+          <h1>Track your time</h1>
+          <p class="sub">Quietly measure where your hours go. Nothing leaves this device until you do.</p>
+        </div>
+        <form id="connect-form" novalidate>
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input type="email" id="email" autocomplete="email" placeholder="you@example.com" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input type="password" id="password" autocomplete="current-password" placeholder="••••••••" required />
+          </label>
+          <button class="btn btn-primary" id="connect-btn" type="submit">Sign in</button>
+          <p class="form-error" id="connect-error" hidden></p>
+        </form>
+      </section>
+
+      <section class="view" id="view-track" hidden>
+        <div class="card" id="track-card">
+          <div class="card-top">
+            <div class="card-title">
+              <p class="eyebrow" id="track-status">Tracking</p>
+              <h2 class="domain" id="track-domain">—</h2>
+            </div>
+            <span class="chip" id="track-category">—</span>
+          </div>
+          <p class="timer" id="track-timer">00:00</p>
+          <p class="hint" id="track-hint">Only active time counts — idle never adds up.</p>
+        </div>
+
+        <div class="row">
+          <div>
+            <p class="row-label">Tracking</p>
+            <p class="row-sub" id="toggle-sub">Watch the current tab and count the time</p>
+          </div>
+          <button class="switch" id="toggle-btn" role="switch" aria-checked="true" aria-label="Toggle tracking"></button>
+        </div>
+
+        <div class="sync-row" id="sync-row">
+          <span class="sync-dot" id="sync-dot"></span>
+          <span class="sync-text" id="sync-text">Synced</span>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-secondary" id="sync-btn">Sync now</button>
+          <button class="btn btn-ghost" id="signout-btn">Sign out</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
