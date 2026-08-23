@@ -3,14 +3,17 @@ import type { Response } from "express";
 import { env } from "../config/env";
 
 export const AUTH_COOKIE = "token";
-const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface TokenPayload {
   userId: string;
 }
 
 export function signToken(userId: string): string {
-  return jwt.sign({ userId }, env.jwtSecret, { expiresIn: "7d" });
+  return jwt.sign({ userId }, env.jwtSecret, {
+    expiresIn: "7d",
+  });
 }
 
 export function verifyToken(token: string): TokenPayload {
@@ -20,8 +23,8 @@ export function verifyToken(token: string): TokenPayload {
 export function setAuthCookie(res: Response, token: string): void {
   res.cookie(AUTH_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: env.isProduction,
+    secure: true,
+    sameSite: "none",
     maxAge: TOKEN_MAX_AGE_MS,
     path: "/",
   });
@@ -30,8 +33,8 @@ export function setAuthCookie(res: Response, token: string): void {
 export function clearAuthCookie(res: Response): void {
   res.clearCookie(AUTH_COOKIE, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: env.isProduction,
+    secure: true,
+    sameSite: "none",
     path: "/",
   });
 }
