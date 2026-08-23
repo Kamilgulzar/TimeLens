@@ -6,7 +6,7 @@ import activityRoutes from "./routes/activity.routes";
 import { env } from "./config/env";
 import { AppError } from "./utils/errors";
 
-export const app = express();
+const app = express();
 
 app.use(cors({ origin: env.clientUrl, credentials: true }));
 app.use(express.json());
@@ -35,3 +35,5 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
 app.use(notFoundHandler);
 app.use(errorHandler);
+
+export default app;
