@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TimeLens
 
 Productivity intelligence platform that helps you understand how you spend your time.
@@ -108,3 +109,6 @@ TImeLens/
 | POST | `/api/auth/login` | Sign in |
 | GET | `/api/auth/me` | Get current user (protected) |
 | GET | `/api/health` | Health check |
+=======
+# TimeLens
+>>>>>>> b66f5abbdc20a918b4860c946d9761c99d27f427
