@@ -16,7 +16,15 @@
     "service_worker": "background/index.js",
     "type": "module"
   },
-  "permissions": ["tabs", "idle", "alarms", "storage"],
-  "host_permissions": ["http://localhost:5000/*"],
+  "permissions": [
+    "tabs",
+    "idle",
+    "alarms",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:5000/*",
+    "https://server-liart-xi-18.vercel.app/*"
+  ],
   "minimum_chrome_version": "110"
 }

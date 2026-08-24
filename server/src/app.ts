@@ -9,7 +9,33 @@ import prisma from "./prisma/client"
 
 const app = express();
 
-app.use(cors({ origin: env.clientUrl, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin, such as server-to-server requests.
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      // Allow the TimeLens web client.
+      if (origin === env.clientUrl) {
+        callback(null, true);
+        return;
+      }
+
+      // Allow the TimeLens Chrome/Edge extension.
+      if (origin.startsWith("chrome-extension://")) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 

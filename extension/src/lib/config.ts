@@ -5,7 +5,7 @@
  * make sure the matching origins are present in manifest.json host_permissions.
  */
 
-export const API_BASE_URL = "http://localhost:5000/api";
+export const API_BASE_URL = "https://server-liart-xi-18.vercel.app/api";
 
 export const SYNC_ALARM_NAME = "timelens-sync";
 export const SYNC_INTERVAL_MINUTES = 1;
