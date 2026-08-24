@@ -74,13 +74,33 @@ function buildSeries(summary: ActivitySummary, view: ViewKey): SeriesDatum[] {
   };
 
   if (view === "day") {
-    const today = localDayString(new Date());
+    const now = new Date();
+    const today = localDayString(now);
+
     return Array.from({ length: 24 }, (_, hour) => {
-      const key = `${today}T${pad2(hour)}`;
+      // The API's hourly buckets are UTC, while the chart is displayed
+      // in the user's local timezone. Build the local hour first, then
+      // convert that same instant to the UTC bucket used by the API.
+      const localHour = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        hour,
+        0,
+        0,
+        0
+      );
+
+      const apiKey =
+        `${localHour.getUTCFullYear()}-` +
+        `${pad2(localHour.getUTCMonth() + 1)}-` +
+        `${pad2(localHour.getUTCDate())}T` +
+        `${pad2(localHour.getUTCHours())}`;
+
       return {
-        key,
+        key: `${today}T${pad2(hour)}`,
         label: hourLabel(hour),
-        values: countsFor(byKey.get(key)),
+        values: countsFor(byKey.get(apiKey)),
       };
     });
   }
@@ -302,7 +322,7 @@ function BrowsingActivityCard({
   const dayKeys = useMemo(() => data.map((d) => d.key), [data]);
   const ticks = useMemo(() => {
     if (view === "day") {
-      return [0, 4, 8, 12, 16, 20].map((h) => dayKeys[h] ?? "").filter(Boolean);
+      return [0, 4, 8, 12, 16, 20].map((h) => dayKeys[h]).filter(Boolean);
     }
     if (view === "week") {
       return dayKeys;
