@@ -122,9 +122,9 @@ function labelForBucket(bucket: number, tzOffsetMinutes: number, granularity: "h
   const startUtc = bucket * (granularity === "hour" ? HOUR_MS : DAY_MS) - tzOffsetMinutes * MINUTE_MS;
   const dt = new Date(startUtc);
   if (granularity === "day") {
-    const m = dt.getMonth() + 1;
-    const day = dt.getDate();
-    return `${dt.getFullYear()}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const m = dt.getUTCMonth() + 1;
+    const day = dt.getUTCDate();
+    return `${dt.getUTCFullYear()}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
   return `${labelForBucket(Math.floor(bucket / 24), tzOffsetMinutes, "day")}T${String(bucket % 24).padStart(2, "0")}`;
 }

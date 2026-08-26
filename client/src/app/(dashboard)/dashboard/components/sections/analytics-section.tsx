@@ -78,29 +78,11 @@ function buildSeries(summary: ActivitySummary, view: ViewKey): SeriesDatum[] {
     const today = localDayString(now);
 
     return Array.from({ length: 24 }, (_, hour) => {
-      // The API's hourly buckets are UTC, while the chart is displayed
-      // in the user's local timezone. Build the local hour first, then
-      // convert that same instant to the UTC bucket used by the API.
-      const localHour = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        hour,
-        0,
-        0,
-        0
-      );
-
-      const apiKey =
-        `${localHour.getUTCFullYear()}-` +
-        `${pad2(localHour.getUTCMonth() + 1)}-` +
-        `${pad2(localHour.getUTCDate())}T` +
-        `${pad2(localHour.getUTCHours())}`;
-
+      const key = `${today}T${pad2(hour)}`;
       return {
-        key: `${today}T${pad2(hour)}`,
+        key,
         label: hourLabel(hour),
-        values: countsFor(byKey.get(apiKey)),
+        values: countsFor(byKey.get(key)),
       };
     });
   }
@@ -121,7 +103,7 @@ function buildSeries(summary: ActivitySummary, view: ViewKey): SeriesDatum[] {
     const key = localDayString(d);
     data.push({
       key,
-      label: String(d.getDate()),
+      label: `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`,
       values: countsFor(byKey.get(key)),
     });
   }
