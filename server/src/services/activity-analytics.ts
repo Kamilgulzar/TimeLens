@@ -118,15 +118,14 @@ function bucketKey(startTime: Date, tzOffsetMinutes: number, granularity: "hour"
   return Math.floor(t / (granularity === "hour" ? HOUR_MS : DAY_MS));
 }
 
-function labelForBucket(bucket: number, tzOffsetMinutes: number, granularity: "hour" | "day"): string {
-  const startUtc = bucket * (granularity === "hour" ? HOUR_MS : DAY_MS) - tzOffsetMinutes * MINUTE_MS;
-  const dt = new Date(startUtc);
+function labelForBucket(bucket: number, granularity: "hour" | "day"): string {
+  const dt = new Date(bucket * (granularity === "hour" ? HOUR_MS : DAY_MS));
   if (granularity === "day") {
     const m = dt.getUTCMonth() + 1;
     const day = dt.getUTCDate();
     return `${dt.getUTCFullYear()}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
-  return `${labelForBucket(Math.floor(bucket / 24), tzOffsetMinutes, "day")}T${String(bucket % 24).padStart(2, "0")}`;
+  return `${labelForBucket(Math.floor(bucket / 24), "day")}T${String(bucket % 24).padStart(2, "0")}`;
 }
 
 /** Group raw Activity rows into the dashboard summary. */
@@ -176,7 +175,7 @@ export function summarizeActivities(
       point.distract += kind === "distract" ? a.duration : 0;
     } else {
       seriesMap.set(key, {
-        bucket: labelForBucket(key, tzOffsetMinutes, granularity),
+        bucket: labelForBucket(key, granularity),
         total: a.duration,
         focus: kind === "focus" ? a.duration : 0,
         neutral: kind === "neutral" ? a.duration : 0,
@@ -231,7 +230,7 @@ export function summarizeActivities(
     series: [...seriesMap.values()].sort((a, b) => a.bucket.localeCompare(b.bucket)),
     seriesByCategory: [...seriesCategoryMap.entries()]
       .map(([key, cats]) => ({
-        bucket: labelForBucket(key, tzOffsetMinutes, granularity),
+        bucket: labelForBucket(key, granularity),
         categories: Object.fromEntries(cats) as Partial<Record<ActivityCategory, number>>,
       }))
       .sort((a, b) => a.bucket.localeCompare(b.bucket)),
