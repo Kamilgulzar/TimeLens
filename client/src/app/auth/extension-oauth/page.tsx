@@ -24,14 +24,15 @@ function ExtensionOAuthInner() {
 
     sessionStorage.setItem("timelens_extension_redirect", redirect);
     sessionStorage.setItem("timelens_oauth", provider);
+    sessionStorage.setItem("timelens_source", "extension");
 
     const strategy = provider === "github" ? "oauth_github" as const : "oauth_google" as const;
 
     signIn
       .create({
         strategy,
-        redirectUrl: "/sso-callback?source=extension",
-        actionCompleteRedirectUrl: "/sso-callback?source=extension",
+        redirectUrl: "/sso-callback",
+        actionCompleteRedirectUrl: "/sso-callback",
       })
       .then((res) => {
         if (res.error) throw res.error;
@@ -61,7 +62,7 @@ function ExtensionOAuthInner() {
               strokeWidth={1.5}
             />
             <p className="text-[14px] text-[#667085] dark:text-[#98A2B3]">
-              Opening Google sign-in…
+              Starting sign-in…
             </p>
           </>
         )}

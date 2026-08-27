@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -11,9 +11,10 @@ import BfcacheGuard from "@/components/auth/BfcacheGuard";
  * OAuth callback. Clerk redirects the browser here after the user authenticates
  * with Google or GitHub.
  *
- * - Normal flow (no source param): hands identity to /auth/oauth → session cookie → dashboard.
- * - Extension flow (source=extension): calls /auth/extension-oauth → token in body →
- *   redirects to chromiumapp.org with token + user for the extension to capture.
+ * - Normal flow: hands identity to /auth/oauth → session cookie → dashboard.
+ * - Extension flow (timelens_source=extension in sessionStorage): calls
+ *   /auth/extension-oauth → token in body → redirects to chromiumapp.org
+ *   with token + user for the extension to capture.
  */
 function SSOCallbackInner() {
   const { loaded } = useClerk();
@@ -21,15 +22,15 @@ function SSOCallbackInner() {
   const { signUp } = useSignUp();
   const { oauthSignIn } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const hasRun = useRef(false);
 
   useEffect(() => {
     if (!loaded || hasRun.current) return;
     hasRun.current = true;
 
-    const source = searchParams.get("source");
-    const isExtension = source === "extension";
+    const isExtension =
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem("timelens_source") === "extension";
 
     (async () => {
       try {
@@ -107,9 +108,10 @@ function SSOCallbackInner() {
       } finally {
         window.sessionStorage.removeItem("timelens_oauth");
         window.sessionStorage.removeItem("timelens_extension_redirect");
+        window.sessionStorage.removeItem("timelens_source");
       }
     })();
-  }, [loaded, signIn, signUp, oauthSignIn, router, searchParams]);
+  }, [loaded, signIn, signUp, oauthSignIn, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
