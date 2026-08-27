@@ -61,6 +61,8 @@ interface TimelensMessage {
   enabled?: boolean;
   email?: string;
   password?: string;
+  token?: string;
+  user?: { id: string; email: string; firstName?: string; lastName?: string };
 }
 
 interface TimelensResponse {
@@ -84,6 +86,16 @@ async function handleMessage(message: TimelensMessage): Promise<TimelensResponse
       const result = await tracker.connect(
         message.email ?? "",
         message.password ?? ""
+      );
+      return result.ok
+        ? { ok: true, snapshot: await tracker.snapshot() }
+        : { ok: false, error: result.error, snapshot: await tracker.snapshot() };
+    }
+
+    case "timelens.oauth": {
+      const result = await tracker.connectWithOAuth(
+        message.token ?? "",
+        message.user ?? { id: "", email: "" }
       );
       return result.ok
         ? { ok: true, snapshot: await tracker.snapshot() }

@@ -29,3 +29,20 @@ export async function loginWithCredentials(
       .join(" "),
   };
 }
+
+/**
+ * Accept a pre-verified OAuth token + user from the background OAuth flow.
+ * The server already issued the JWT via /auth/extension-oauth; we just
+ * store it as AuthInfo without making another API call.
+ */
+export async function loginWithOAuth(
+  token: string,
+  user: { id: string; email: string; firstName?: string; lastName?: string }
+): Promise<AuthInfo> {
+  return {
+    token,
+    userId: user.id,
+    email: user.email,
+    displayName: [user.firstName, user.lastName].filter(Boolean).join(" "),
+  };
+}

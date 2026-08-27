@@ -141,6 +141,19 @@ export const timelensApi = {
     });
   },
 
+  extensionOAuthLogin(
+    provider: string,
+    email: string,
+    firstName?: string,
+    lastName?: string,
+    avatar?: string
+  ): Promise<ExtensionLoginResponse> {
+    return request<ExtensionLoginResponse>("/auth/extension-oauth", {
+      method: "POST",
+      body: { provider, email, firstName, lastName, avatar },
+    });
+  },
+
   submitActivities(
     token: string,
     events: ActivityEvent[]

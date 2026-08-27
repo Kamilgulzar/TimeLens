@@ -2,11 +2,17 @@ import { POPUP_REFRESH_MS } from "../lib/config.js";
 import type { StoreError, TrackerSnapshot } from "../types/activity.js";
 import { formatDuration } from "./format.js";
 
+const CLIENT_ID = "493239630010-dk185l88dj52d1qpbq05q48r0gsnqtu6.apps.googleusercontent.com";
+const GITHUB_CLIENT_ID = "Ov23li0iVtshsKVeR6KJ";
+const CHROMIUM_ORIGIN = "https://knlgbpmcjgcdmaclgojhejmcdijfogmk.chromiumapp.org";
+
 interface PopupMessage {
   kind: string;
   enabled?: boolean;
   email?: string;
   password?: string;
+  token?: string;
+  user?: { id: string; email: string; firstName?: string; lastName?: string };
 }
 
 interface PopupResponse {
@@ -29,6 +35,8 @@ const el = {
   password: document.getElementById("password") as HTMLInputElement,
   connectBtn: document.getElementById("connect-btn") as HTMLButtonElement,
   connectError: document.getElementById("connect-error") as HTMLParagraphElement,
+  googleBtn: document.getElementById("google-btn") as HTMLButtonElement,
+  githubBtn: document.getElementById("github-btn") as HTMLButtonElement,
   trackCard: document.getElementById("track-card") as HTMLDivElement,
   trackStatus: document.getElementById("track-status") as HTMLParagraphElement,
   trackDomain: document.getElementById("track-domain") as HTMLHeadingElement,
@@ -134,6 +142,81 @@ async function refresh(): Promise<void> {
   }
 }
 
+function startOAuth(provider: "google" | "github"): void {
+  const clientId = provider === "google" ? CLIENT_ID : GITHUB_CLIENT_ID;
+  const baseUrl = provider === "google"
+    ? "https://accounts.google.com/o/oauth2/v2/auth"
+    : "https://github.com/login/oauth/authorize";
+  const redirectUri = `${CHROMIUM_ORIGIN}/`;
+  const scope = provider === "google" ? "email profile" : "read:user user:email";
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "token",
+    scope,
+  });
+
+  chrome.identity.launchWebAuthFlow(
+    { url: `${baseUrl}?${params.toString()}`, interactive: true },
+    (redirectUrl) => {
+      if (chrome.runtime.lastError || !redirectUrl) {
+        el.connectError.textContent = chrome.runtime.lastError?.message ?? "OAuth flow was cancelled.";
+        el.connectError.hidden = false;
+        return;
+      }
+
+      const url = new URL(redirectUrl);
+      const fragment = url.hash.substring(1);
+      const tokenParams = new URLSearchParams(fragment);
+      const accessToken = tokenParams.get("access_token");
+
+      if (!accessToken) {
+        el.connectError.textContent = "Failed to obtain access token.";
+        el.connectError.hidden = false;
+        return;
+      }
+
+      const userInfoUrl = provider === "google"
+        ? "https://www.googleapis.com/oauth2/v2/userinfo"
+        : "https://api.github.com/user";
+
+      fetch(userInfoUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((r) => r.json())
+        .then((userInfo: any) => {
+          const email = userInfo.email;
+          const firstName = userInfo.given_name ?? userInfo.name?.split(" ")[0] ?? "";
+          const lastName = userInfo.family_name ?? userInfo.name?.split(" ").slice(1).join(" ") ?? "";
+
+          if (!email) {
+            el.connectError.textContent = "Could not retrieve email from OAuth provider.";
+            el.connectError.hidden = false;
+            return;
+          }
+
+          sendMessage({
+            kind: "timelens.oauth",
+            token: accessToken,
+            user: { id: "", email, firstName, lastName },
+          }).then((response) => {
+            if (response.ok && response.snapshot) {
+              render(response.snapshot);
+            } else {
+              el.connectError.textContent = response.error ?? "OAuth login failed.";
+              el.connectError.hidden = false;
+            }
+          });
+        })
+        .catch(() => {
+          el.connectError.textContent = "Failed to fetch user info from OAuth provider.";
+          el.connectError.hidden = false;
+        });
+    }
+  );
+}
+
 el.connectForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   el.connectError.hidden = true;
@@ -192,3 +275,6 @@ el.signoutBtn.addEventListener("click", async () => {
 
 void refresh();
 setInterval(() => void refresh(), POPUP_REFRESH_MS);
+
+el.googleBtn.addEventListener("click", () => startOAuth("google"));
+el.githubBtn.addEventListener("click", () => startOAuth("github"));

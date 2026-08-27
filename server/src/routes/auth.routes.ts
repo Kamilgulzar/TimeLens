@@ -16,6 +16,7 @@ router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password", authController.resetPassword);
 
 router.post("/oauth", authController.oauthLogin);
+router.post("/extension-oauth", authController.extensionOAuthLogin);
 
 router.get("/me", authenticate, authController.me);
 router.patch("/me", authenticate, authController.updateProfile);

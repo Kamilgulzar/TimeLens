@@ -1,4 +1,4 @@
-import { loginWithCredentials } from "../auth/auth-client.js";
+import { loginWithCredentials, loginWithOAuth } from "../auth/auth-client.js";
 import { classifyDomain } from "../categorization/categories.js";
 import { clearQueue, enqueueEvent } from "../storage/activity-queue.js";
 import {
@@ -151,6 +151,36 @@ const tracker = {
       s.error = null;
       await updateState(() => {});
       log("connected:", auth.email);
+
+      await ensureActiveTarget(await getActiveTabTarget());
+      void reportHeartbeat();
+      return { ok: true };
+    });
+  },
+
+  async connectWithOAuth(
+    token: string,
+    user: { id: string; email: string; firstName?: string; lastName?: string }
+  ): Promise<{ ok: boolean; error?: string }> {
+    return runExclusive(async () => {
+      let auth: AuthInfo;
+      try {
+        auth = await loginWithOAuth(token, user);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to sign in.";
+        await updateState((s) => {
+          s.error = { code: "auth", message };
+        });
+        return { ok: false, error: message };
+      }
+
+      const s = await getState();
+      s.auth = auth;
+      s.trackingEnabled = true;
+      s.session = null;
+      s.error = null;
+      await updateState(() => {});
+      log("connected (oauth):", auth.email);
 
       await ensureActiveTarget(await getActiveTabTarget());
       void reportHeartbeat();

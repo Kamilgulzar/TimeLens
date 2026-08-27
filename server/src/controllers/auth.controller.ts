@@ -109,6 +109,19 @@ export const authController = {
     }
   },
 
+  async extensionOAuthLogin(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const data = oauthSchema.parse(req.body);
+      const result = await authService.oauthLogin(data);
+
+      const token = signToken(result.user.id);
+
+      res.json({ token, user: result.user });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async me(req: AuthRequest, res: Response): Promise<void> {
     try {
       const result = await authService.getMe(req.userId as string);

@@ -20,7 +20,8 @@
     "tabs",
     "idle",
     "alarms",
-    "storage"
+    "storage",
+    "identity"
   ],
   "host_permissions": [
     "http://localhost:5000/*",
