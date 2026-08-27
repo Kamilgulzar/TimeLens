@@ -1,18 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useClerk, useSignIn } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 function ExtensionOAuthInner() {
-  const { loaded } = useClerk();
+  const { loaded, signOut } = useClerk();
   const { signIn } = useSignIn();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const hasRun = useRef(false);
 
   useEffect(() => {
-    if (!loaded || !signIn) return;
+    if (!loaded || !signIn || hasRun.current) return;
+    hasRun.current = true;
 
     const provider = searchParams.get("provider") as "google" | "github" | null;
     const redirect = searchParams.get("redirect");
@@ -28,13 +30,16 @@ function ExtensionOAuthInner() {
 
     const strategy = provider === "github" ? "oauth_github" as const : "oauth_google" as const;
 
-    signIn
-      .create({
-        strategy,
-        redirectUrl: "/sso-callback",
-        actionCompleteRedirectUrl: "/sso-callback",
-      })
-      .then((res) => {
+    (async () => {
+      try {
+        // Sign out of any existing Clerk session to avoid conflicts.
+        await signOut();
+
+        const res = await signIn.create({
+          strategy,
+          redirectUrl: "/sso-callback",
+          actionCompleteRedirectUrl: "/sso-callback",
+        });
         if (res.error) throw res.error;
 
         const verificationUrl =
@@ -44,11 +49,11 @@ function ExtensionOAuthInner() {
         } else {
           setError("Failed to start OAuth flow.");
         }
-      })
-      .catch((err) => {
-        setError(err?.message ?? "Failed to start OAuth flow.");
-      });
-  }, [loaded, signIn, searchParams]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to start OAuth flow.");
+      }
+    })();
+  }, [loaded, signIn, signOut, searchParams]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">

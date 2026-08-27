@@ -2,9 +2,7 @@ import { POPUP_REFRESH_MS } from "../lib/config.js";
 import type { StoreError, TrackerSnapshot } from "../types/activity.js";
 import { formatDuration } from "./format.js";
 
-const CLIENT_ID = "493239630010-dk185l88dj52d1qpbq05q48r0gsnqtu6.apps.googleusercontent.com";
-const GITHUB_CLIENT_ID = "Ov23li0iVtshsKVeR6KJ";
-const CHROMIUM_ORIGIN = "https://knlgbpmcjgcdmaclgojhejmcdijfogmk.chromiumapp.org";
+const CLIENT_APP_URL = "https://timelens-client.vercel.app";
 
 interface PopupMessage {
   kind: string;
@@ -143,22 +141,11 @@ async function refresh(): Promise<void> {
 }
 
 function startOAuth(provider: "google" | "github"): void {
-  const clientId = provider === "google" ? CLIENT_ID : GITHUB_CLIENT_ID;
-  const baseUrl = provider === "google"
-    ? "https://accounts.google.com/o/oauth2/v2/auth"
-    : "https://github.com/login/oauth/authorize";
-  const redirectUri = `${CHROMIUM_ORIGIN}/`;
-  const scope = provider === "google" ? "email profile" : "read:user user:email";
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: "token",
-    scope,
-  });
+  const redirectUri = `${chrome.identity.getRedirectURL()}`;
+  const authUrl = `${CLIENT_APP_URL}/auth/extension-oauth?provider=${provider}&redirect=${encodeURIComponent(redirectUri)}`;
 
   chrome.identity.launchWebAuthFlow(
-    { url: `${baseUrl}?${params.toString()}`, interactive: true },
+    { url: authUrl, interactive: true },
     (redirectUrl) => {
       if (chrome.runtime.lastError || !redirectUrl) {
         el.connectError.textContent = chrome.runtime.lastError?.message ?? "OAuth flow was cancelled.";
@@ -167,52 +154,36 @@ function startOAuth(provider: "google" | "github"): void {
       }
 
       const url = new URL(redirectUrl);
-      const fragment = url.hash.substring(1);
-      const tokenParams = new URLSearchParams(fragment);
-      const accessToken = tokenParams.get("access_token");
+      const token = url.searchParams.get("token");
+      const userJson = url.searchParams.get("user");
 
-      if (!accessToken) {
-        el.connectError.textContent = "Failed to obtain access token.";
+      if (!token || !userJson) {
+        el.connectError.textContent = "OAuth flow did not return a token.";
         el.connectError.hidden = false;
         return;
       }
 
-      const userInfoUrl = provider === "google"
-        ? "https://www.googleapis.com/oauth2/v2/userinfo"
-        : "https://api.github.com/user";
+      let user: { id: string; email: string; firstName?: string; lastName?: string };
+      try {
+        user = JSON.parse(userJson);
+      } catch {
+        el.connectError.textContent = "Invalid user data from OAuth flow.";
+        el.connectError.hidden = false;
+        return;
+      }
 
-      fetch(userInfoUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-        .then((r) => r.json())
-        .then((userInfo: any) => {
-          const email = userInfo.email;
-          const firstName = userInfo.given_name ?? userInfo.name?.split(" ")[0] ?? "";
-          const lastName = userInfo.family_name ?? userInfo.name?.split(" ").slice(1).join(" ") ?? "";
-
-          if (!email) {
-            el.connectError.textContent = "Could not retrieve email from OAuth provider.";
-            el.connectError.hidden = false;
-            return;
-          }
-
-          sendMessage({
-            kind: "timelens.oauth",
-            token: accessToken,
-            user: { id: "", email, firstName, lastName },
-          }).then((response) => {
-            if (response.ok && response.snapshot) {
-              render(response.snapshot);
-            } else {
-              el.connectError.textContent = response.error ?? "OAuth login failed.";
-              el.connectError.hidden = false;
-            }
-          });
-        })
-        .catch(() => {
-          el.connectError.textContent = "Failed to fetch user info from OAuth provider.";
+      sendMessage({
+        kind: "timelens.oauth",
+        token,
+        user,
+      }).then((response) => {
+        if (response.ok && response.snapshot) {
+          render(response.snapshot);
+        } else {
+          el.connectError.textContent = response.error ?? "OAuth login failed.";
           el.connectError.hidden = false;
-        });
+        }
+      });
     }
   );
 }
