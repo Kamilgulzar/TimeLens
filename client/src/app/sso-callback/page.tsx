@@ -7,15 +7,6 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import BfcacheGuard from "@/components/auth/BfcacheGuard";
 
-/**
- * OAuth callback. Clerk redirects the browser here after the user authenticates
- * with Google or GitHub.
- *
- * - Normal flow: hands identity to /auth/oauth → session cookie → dashboard.
- * - Extension flow (timelens_source=extension in sessionStorage): calls
- *   /auth/extension-oauth → token in body → redirects to chromiumapp.org
- *   with token + user for the extension to capture.
- */
 function SSOCallbackInner() {
   const { loaded } = useClerk();
   const { signIn } = useSignIn();
@@ -40,36 +31,50 @@ function SSOCallbackInner() {
 
         if (!provider) throw new Error("Missing OAuth provider.");
 
+        // Clerk may need a tick to finalize the sign-in after redirect.
+        // Poll signIn.status until it's "complete" or we time out.
         let email: string | null = null;
         let firstName: string | undefined;
         let lastName: string | undefined;
         let avatar: string | undefined;
 
-        // Existing identity (Clerk user already exists).
-        if (signIn.status === "complete" && signIn.identifier) {
+        const MAX_ATTEMPTS = 20;
+        for (let i = 0; i < MAX_ATTEMPTS; i++) {
+          if (signIn.status === "complete" && signIn.identifier) {
+            email = signIn.identifier;
+            firstName = signIn.userData?.firstName;
+            lastName = signIn.userData?.lastName;
+            avatar = signIn.userData?.imageUrl;
+            break;
+          }
+
+          // Try transfer if sign-in is transferable.
+          if (!email && signIn.isTransferable) {
+            const res = await signUp.create({ transfer: true });
+            if (res.error) throw res.error;
+            if (signUp.emailAddress) {
+              email = signUp.emailAddress;
+              firstName = firstName ?? signUp.firstName ?? undefined;
+              lastName = lastName ?? signUp.lastName ?? undefined;
+            }
+            break;
+          }
+
+          // Wait 150ms for Clerk to settle.
+          await new Promise((r) => setTimeout(r, 150));
+        }
+
+        // One final check after polling.
+        if (!email && signIn.status === "complete" && signIn.identifier) {
           email = signIn.identifier;
           firstName = signIn.userData?.firstName;
           lastName = signIn.userData?.lastName;
           avatar = signIn.userData?.imageUrl;
         }
 
-        // New identity: transfer the sign-in into a sign-up.
-        if (!email && signIn.isTransferable) {
-          const res = await signUp.create({ transfer: true });
-          if (res.error) throw res.error;
-        }
-
-        if (!email && signUp.emailAddress) {
-          email = signUp.emailAddress;
-          firstName = firstName ?? signUp.firstName ?? undefined;
-          lastName = lastName ?? signUp.lastName ?? undefined;
-        }
-
         if (!email) throw new Error("OAuth flow did not produce an email.");
 
         if (isExtension) {
-          // Extension flow: call /auth/extension-oauth to get token + user in body,
-          // then redirect to the extension's chromiumapp.org callback URL.
           const redirectUrl = window.sessionStorage.getItem(
             "timelens_extension_redirect"
           );
@@ -90,7 +95,6 @@ function SSOCallbackInner() {
 
           const userParam = encodeURIComponent(JSON.stringify(user));
           window.location.href = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${userParam}`;
-          // Navigation is happening; do not remove session storage yet.
           return;
         }
 
@@ -102,8 +106,15 @@ function SSOCallbackInner() {
           lastName,
           avatar,
         });
-        // oauthSignIn calls router.push("/dashboard") on success.
       } catch {
+        if (isExtension) {
+          // For extension flow, show error in-page instead of redirecting
+          // (redirecting inside launchWebAuthFlow breaks the flow).
+          document.title = "OAuth Error";
+          document.body.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#ef4444"><p>OAuth failed. Close this window and try again.</p></div>';
+          return;
+        }
         router.replace("/login?oauth=error");
       } finally {
         window.sessionStorage.removeItem("timelens_oauth");

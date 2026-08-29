@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 function ExtensionOAuthInner() {
-  const { loaded, signOut } = useClerk();
+  const { loaded } = useClerk();
   const { signIn } = useSignIn();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -30,16 +30,13 @@ function ExtensionOAuthInner() {
 
     const strategy = provider === "github" ? "oauth_github" as const : "oauth_google" as const;
 
-    (async () => {
-      try {
-        // Sign out of any existing Clerk session to avoid conflicts.
-        await signOut();
-
-        const res = await signIn.create({
-          strategy,
-          redirectUrl: "/sso-callback",
-          actionCompleteRedirectUrl: "/sso-callback",
-        });
+    signIn
+      .create({
+        strategy,
+        redirectUrl: "/sso-callback",
+        actionCompleteRedirectUrl: "/sso-callback",
+      })
+      .then((res) => {
         if (res.error) throw res.error;
 
         const verificationUrl =
@@ -49,11 +46,11 @@ function ExtensionOAuthInner() {
         } else {
           setError("Failed to start OAuth flow.");
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to start OAuth flow.");
-      }
-    })();
-  }, [loaded, signIn, signOut, searchParams]);
+      });
+  }, [loaded, signIn, searchParams]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
