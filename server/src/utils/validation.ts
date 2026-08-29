@@ -2,10 +2,22 @@ import { z } from "zod";
 import { ACTIVITY_CATEGORIES } from "../constants/categories";
 
 export const registerSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  firstName: z
+    .string()
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name must be at most 50 characters"),
+  lastName: z
+    .string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name must be at most 50 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128, "Password must be at most 128 characters")
+    .regex(/[a-z]/, "Password must include a lowercase letter")
+    .regex(/[A-Z]/, "Password must include an uppercase letter")
+    .regex(/\d/, "Password must include a number"),
 });
 
 export const loginSchema = z.object({

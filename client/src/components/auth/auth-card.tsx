@@ -1,14 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useClerkOtp } from "@/lib/clerk-otp";
 import { inputBase, primaryButtonClass, socialButtonClass } from "@/components/auth/auth-styles";
 
 type Mode = "signup" | "login";
+
+const NAME_MIN = 2;
+const NAME_MAX = 50;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
 
 interface AuthCardProps {
   initialMode: Mode;
@@ -47,6 +59,96 @@ function GitHubIcon({ className = "" }: { className?: string }) {
   );
 }
 
+/* ── Password strength ─────────────────────────────────────────── */
+
+function evaluateStrength(pw: string): {
+  score: number;
+  label: string;
+  color: string;
+} {
+  let score = 0;
+  if (pw.length >= PASSWORD_MIN) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  const map = {
+    0: { label: "Too short", color: "#DC2626" },
+    1: { label: "Weak", color: "#F97316" },
+    2: { label: "Fair", color: "#EAB308" },
+    3: { label: "Strong", color: "#22C55E" },
+    4: { label: "Very strong", color: "#16A34A" },
+  } as const;
+  return { score, ...(map as Record<number, { label: string; color: string }>)[score] };
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const { score, label, color } = useMemo(() => evaluateStrength(password), [password]);
+  if (!password) return null;
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="flex gap-1.5">
+        {([0, 1, 2, 3] as const).map((i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors duration-300"
+            style={{
+              backgroundColor: i < score ? color : "#E5E7EB",
+            }}
+          />
+        ))}
+      </div>
+      <p className="text-[12px] font-medium" style={{ color }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
+/* ── Validation helpers ─────────────────────────────────────────── */
+
+function nameError(value: string, label: string): string | null {
+  const v = value.trim();
+  if (v.length === 0) return `${label} is required`;
+  if (v.length < NAME_MIN) return `${label} must be at least ${NAME_MIN} characters`;
+  if (v.length > NAME_MAX) return `${label} must be at most ${NAME_MAX} characters`;
+  return null;
+}
+
+function emailError(value: string): string | null {
+  if (!value) return "Email is required";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Enter a valid email address";
+  return null;
+}
+
+function passwordError(value: string): string | null {
+  if (!value) return "Password is required";
+  if (value.length < PASSWORD_MIN) return `Password must be at least ${PASSWORD_MIN} characters`;
+  if (value.length > PASSWORD_MAX) return `Password must be at most ${PASSWORD_MAX} characters`;
+  if (!/[a-z]/.test(value)) return "Password must include a lowercase letter";
+  if (!/[A-Z]/.test(value)) return "Password must include an uppercase letter";
+  if (!/\d/.test(value)) return "Password must include a number";
+  return null;
+}
+
+/* ── Field feedback icon ────────────────────────────────────────── */
+
+function FieldIcon({ ok, error }: { ok: boolean; error: string | null }) {
+  if (!error) return null;
+  return (
+    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2">
+      {ok ? (
+        <CheckCircle2 className="h-[16px] w-[16px] text-green-500" />
+      ) : (
+        <AlertCircle className="h-[16px] w-[16px] text-red-400" />
+      )}
+    </span>
+  );
+}
+
+/* ── Main component ────────────────────────────────────────────── */
+
 export function AuthCard({
   initialMode,
   resetSuccess = false,
@@ -58,15 +160,10 @@ export function AuthCard({
   const router = useRouter();
 
   useEffect(() => {
-    if (resetSuccess) {
-      router.replace("/login", { scroll: false });
-    }
+    if (resetSuccess) router.replace("/login", { scroll: false });
   }, [resetSuccess, router]);
-
   useEffect(() => {
-    if (verifiedSuccess) {
-      router.replace("/login", { scroll: false });
-    }
+    if (verifiedSuccess) router.replace("/login", { scroll: false });
   }, [verifiedSuccess, router]);
 
   const [firstName, setFirstName] = useState("");
@@ -79,24 +176,59 @@ export function AuthCard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null);
 
+  /* Touch / blur tracking for inline errors */
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const markTouched = (k: string) => setTouched((t) => ({ ...t, [k]: true }));
+
+  /* Inline errors (signup only, after first blur) */
+  const fErr = isSignup && touched.firstName ? nameError(firstName, "First name") : null;
+  const lErr = isSignup && touched.lastName ? nameError(lastName, "Last name") : null;
+  const eErr = touched.email ? emailError(email) : null;
+  const pErr = isSignup && touched.password ? passwordError(password) : null;
+  const cpErr = isSignup && touched.confirmPassword
+    ? confirmPassword !== password
+      ? "Passwords don't match"
+      : null
+    : null;
+
+  const canSubmit = isSignup
+    ? !fErr && !lErr && !eErr && !pErr && !cpErr && firstName.trim() && lastName.trim() && email && password && confirmPassword
+    : !eErr && email && password;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (isSignup && password !== confirmPassword) {
-      setError("Passwords don't match. Please try again.");
-      return;
+    if (isSignup) {
+      const fe = nameError(firstName, "First name");
+      const le = nameError(lastName, "Last name");
+      const ee = emailError(email);
+      const pe = passwordError(password);
+      if (fe || le || ee || pe) {
+        setError("Please fix the highlighted fields.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords don't match. Please try again.");
+        return;
+      }
+    } else {
+      const ee = emailError(email);
+      if (ee) {
+        setError(ee);
+        return;
+      }
     }
 
     setIsSubmitting(true);
     try {
       const minimumDelay = new Promise((resolve) => setTimeout(resolve, 700));
       if (isSignup) {
-        const registerPromise = register(firstName, lastName, email, password);
+        const registerPromise = register(firstName.trim(), lastName.trim(), email.trim().toLowerCase(), password);
         const [result] = await Promise.all([registerPromise, minimumDelay]);
         router.push(`/verify-email?email=${encodeURIComponent(result.email)}`);
       } else {
-        const loginPromise = login(email, password);
+        const loginPromise = login(email.trim().toLowerCase(), password);
         await Promise.all([loginPromise, minimumDelay]);
       }
     } catch (err) {
@@ -120,7 +252,6 @@ export function AuthCard({
     setError("");
     setOauthLoading(provider);
     try {
-      // Remember which provider the user picked so /sso-callback knows it.
       window.sessionStorage.setItem("timelens_oauth", provider);
       await startOAuth(provider === "google" ? "oauth_google" : "oauth_github");
     } catch (err: unknown) {
@@ -152,55 +283,80 @@ export function AuthCard({
           : "Sign in to continue understanding how you spend your time."}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-4">
         {error && (
           <div className="rounded-xl border border-red-200/80 bg-red-50/80 dark:border-red-900/40 dark:bg-red-900/20 px-4 py-3 text-[13.5px] text-red-600 dark:text-red-400">
             {error}
           </div>
         )}
 
+        {/* Name fields */}
         {isSignup && (
           <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="First name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-              className={inputBase}
-              autoComplete="given-name"
-            />
-            <input
-              type="text"
-              placeholder="Last name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              required
-              className={inputBase}
-              autoComplete="family-name"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`First name (${NAME_MIN}–${NAME_MAX})`}
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                onBlur={() => markTouched("firstName")}
+                maxLength={NAME_MAX}
+                required
+                className={`${inputBase} ${fErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
+                autoComplete="given-name"
+              />
+              <FieldIcon ok={!fErr} error={fErr} />
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Last name (${NAME_MIN}–${NAME_MAX})`}
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                onBlur={() => markTouched("lastName")}
+                maxLength={NAME_MAX}
+                required
+                className={`${inputBase} ${lErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
+                autoComplete="family-name"
+              />
+              <FieldIcon ok={!lErr} error={lErr} />
+            </div>
+            {fErr && (
+              <p className="col-span-1 -mt-2.5 text-[12px] text-red-500">{fErr}</p>
+            )}
+            {lErr && (
+              <p className="col-span-1 -mt-2.5 text-[12px] text-red-500">{lErr}</p>
+            )}
           </div>
         )}
 
-        <input
-          type="email"
-          placeholder="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className={inputBase}
-          autoComplete="email"
-        />
+        {/* Email */}
+        <div className="relative">
+          <input
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => markTouched("email")}
+            required
+            className={`${inputBase} ${eErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
+            autoComplete="email"
+          />
+          <FieldIcon ok={!eErr} error={eErr} />
+        </div>
+        {eErr && <p className="-mt-2.5 text-[12px] text-red-500">{eErr}</p>}
 
+        {/* Password */}
         <div className="relative">
           <input
             type={showPassword ? "text" : "password"}
-            placeholder="Password"
+            placeholder={`Password (${PASSWORD_MIN}–${PASSWORD_MAX} chars)`}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onBlur={() => markTouched("password")}
             required
-            minLength={isSignup ? 6 : undefined}
-            className={`${inputBase} pr-12`}
+            maxLength={PASSWORD_MAX}
+            className={`${inputBase} pr-12 ${pErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
             autoComplete={isSignup ? "new-password" : "current-password"}
           />
           <button
@@ -217,18 +373,25 @@ export function AuthCard({
             )}
           </button>
         </div>
+        {isSignup && <PasswordStrength password={password} />}
+        {pErr && <p className="-mt-1 text-[12px] text-red-500">{pErr}</p>}
 
+        {/* Confirm password */}
         {isSignup ? (
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="Confirm password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            minLength={6}
-            className={`${inputBase} pr-12`}
-            autoComplete="new-password"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onBlur={() => markTouched("confirmPassword")}
+              required
+              maxLength={PASSWORD_MAX}
+              className={`${inputBase} pr-12 ${cpErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
+              autoComplete="new-password"
+            />
+            <FieldIcon ok={!cpErr} error={cpErr} />
+          </div>
         ) : (
           <div className="text-right">
             <Link
@@ -239,8 +402,9 @@ export function AuthCard({
             </Link>
           </div>
         )}
+        {cpErr && <p className="-mt-2.5 text-[12px] text-red-500">{cpErr}</p>}
 
-        <button type="submit" disabled={isSubmitting} className={`${primaryButtonClass} mt-1`}>
+        <button type="submit" disabled={isSubmitting || (isSignup && !canSubmit)} className={`${primaryButtonClass} mt-1`}>
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
