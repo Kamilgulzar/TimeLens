@@ -18,7 +18,8 @@ import { inputBase, primaryButtonClass, socialButtonClass } from "@/components/a
 type Mode = "signup" | "login";
 
 const NAME_MIN = 2;
-const NAME_MAX = 50;
+const FIRST_NAME_MAX = 15;
+const LAST_NAME_MAX = 20;
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 
@@ -108,11 +109,11 @@ function PasswordStrength({ password }: { password: string }) {
 
 /* ── Validation helpers ─────────────────────────────────────────── */
 
-function nameError(value: string, label: string): string | null {
+function nameError(value: string, label: string, max: number): string | null {
   const v = value.trim();
   if (v.length === 0) return `${label} is required`;
   if (v.length < NAME_MIN) return `${label} must be at least ${NAME_MIN} characters`;
-  if (v.length > NAME_MAX) return `${label} must be at most ${NAME_MAX} characters`;
+  if (v.length > max) return `${label} must be at most ${max} characters`;
   return null;
 }
 
@@ -181,8 +182,8 @@ export function AuthCard({
   const markTouched = (k: string) => setTouched((t) => ({ ...t, [k]: true }));
 
   /* Inline errors (signup only, after first blur) */
-  const fErr = isSignup && touched.firstName ? nameError(firstName, "First name") : null;
-  const lErr = isSignup && touched.lastName ? nameError(lastName, "Last name") : null;
+  const fErr = isSignup && touched.firstName ? nameError(firstName, "First name", FIRST_NAME_MAX) : null;
+  const lErr = isSignup && touched.lastName ? nameError(lastName, "Last name", LAST_NAME_MAX) : null;
   const eErr = touched.email ? emailError(email) : null;
   const pErr = isSignup && touched.password ? passwordError(password) : null;
   const cpErr = isSignup && touched.confirmPassword
@@ -200,8 +201,8 @@ export function AuthCard({
     setError("");
 
     if (isSignup) {
-      const fe = nameError(firstName, "First name");
-      const le = nameError(lastName, "Last name");
+      const fe = nameError(firstName, "First name", FIRST_NAME_MAX);
+      const le = nameError(lastName, "Last name", LAST_NAME_MAX);
       const ee = emailError(email);
       const pe = passwordError(password);
       if (fe || le || ee || pe) {
@@ -296,11 +297,11 @@ export function AuthCard({
             <div className="relative">
               <input
                 type="text"
-                placeholder={`First name (${NAME_MIN}–${NAME_MAX})`}
+                placeholder="First name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 onBlur={() => markTouched("firstName")}
-                maxLength={NAME_MAX}
+                maxLength={FIRST_NAME_MAX}
                 required
                 className={`${inputBase} ${fErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
                 autoComplete="given-name"
@@ -310,11 +311,11 @@ export function AuthCard({
             <div className="relative">
               <input
                 type="text"
-                placeholder={`Last name (${NAME_MIN}–${NAME_MAX})`}
+                placeholder="Last name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 onBlur={() => markTouched("lastName")}
-                maxLength={NAME_MAX}
+                maxLength={LAST_NAME_MAX}
                 required
                 className={`${inputBase} ${lErr ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
                 autoComplete="family-name"
@@ -350,7 +351,7 @@ export function AuthCard({
         <div className="relative">
           <input
             type={showPassword ? "text" : "password"}
-            placeholder={`Password (${PASSWORD_MIN}–${PASSWORD_MAX} chars)`}
+            placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onBlur={() => markTouched("password")}
