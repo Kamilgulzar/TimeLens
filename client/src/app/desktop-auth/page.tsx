@@ -1,19 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, use, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSignIn } from "@clerk/nextjs";
+import { useClerk, useSignIn } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 
 function DesktopAuthInner() {
-  const searchParams = use(useSearchParams());
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const { signIn, isLoaded } = useSignIn();
+  const { loaded } = useClerk();
+  const { signIn } = useSignIn();
   const provider = searchParams.get("provider") as "google" | "github" | null;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !signIn || !provider) return;
+    if (!loaded || !signIn || !provider) return;
 
     if (provider !== "google" && provider !== "github") {
       setError("Invalid OAuth provider. Close this window and try again.");
@@ -30,15 +31,26 @@ function DesktopAuthInner() {
     );
 
     signIn
-      .authenticateWithRedirect({
+      .create({
         strategy,
         redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/sso-callback",
+        actionCompleteRedirectUrl: "/sso-callback",
+      })
+      .then((res) => {
+        if (res.error) throw res.error;
+
+        const verificationUrl =
+          signIn.firstFactorVerification?.externalVerificationRedirectURL;
+        if (verificationUrl) {
+          window.location.href = verificationUrl.toString();
+        } else {
+          setError("Failed to start OAuth flow.");
+        }
       })
       .catch(() => {
         setError("Failed to start OAuth. Close this window and try again.");
       });
-  }, [isLoaded, signIn, provider, router]);
+  }, [loaded, signIn, provider, router]);
 
   if (error) {
     return (
