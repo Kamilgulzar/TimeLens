@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 function DesktopAuthInner() {
   const searchParams = useSearchParams();
-  const { loaded, signOut } = useClerk();
+  const { loaded } = useClerk();
   const { signIn } = useSignIn();
   const provider = searchParams.get("provider") as "google" | "github" | null;
   const [error, setError] = useState<string | null>(null);
@@ -24,40 +24,41 @@ function DesktopAuthInner() {
 
     const strategy = provider === "google" ? "oauth_google" : "oauth_github";
 
-    (async () => {
-      try {
-        await signOut();
+    sessionStorage.setItem("timelens_source", "desktop");
+    sessionStorage.setItem("timelens_oauth", provider);
+    sessionStorage.setItem("timelens_extension_redirect", "timelens://auth");
 
-        sessionStorage.setItem("timelens_source", "desktop");
-        sessionStorage.setItem("timelens_oauth", provider);
-        sessionStorage.setItem("timelens_extension_redirect", "timelens://auth");
-
-        const res = await signIn.create({
-          strategy,
-          redirectUrl: "/sso-callback",
-          actionCompleteRedirectUrl: "/sso-callback",
-        });
+    signIn
+      .create({
+        strategy,
+        redirectUrl: "/sso-callback",
+        actionCompleteRedirectUrl: "/sso-callback",
+      })
+      .then((res) => {
         if (res.error) throw res.error;
 
-        const url = signIn.firstFactorVerification?.externalVerificationRedirectURL;
+        const url =
+          signIn.firstFactorVerification?.externalVerificationRedirectURL;
         if (!url) {
           setError("Failed to start OAuth: no redirect URL returned.");
           return;
         }
         window.location.href = url.toString();
-      } catch (err: unknown) {
+      })
+      .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         setError(`Failed to start OAuth: ${msg}`);
-      }
-    })();
-  }, [loaded, signIn, signOut, provider]);
+      });
+  }, [loaded, signIn, provider]);
 
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
         <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
           <p className="text-[14px] text-[#EF4444]">{error}</p>
-          <p className="text-[12px] text-[#98A2B3]">Close this window and try again from the desktop app.</p>
+          <p className="text-[12px] text-[#98A2B3]">
+            Close this window and try again from the desktop app.
+          </p>
         </div>
       </div>
     );
@@ -66,7 +67,10 @@ function DesktopAuthInner() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
       <div className="flex flex-col items-center gap-4">
-        <Loader2 className="h-7 w-7 animate-spin text-[#6366F1]" strokeWidth={1.5} />
+        <Loader2
+          className="h-7 w-7 animate-spin text-[#6366F1]"
+          strokeWidth={1.5}
+        />
         <p className="text-[14px] text-[#667085] dark:text-[#98A2B3]">
           Opening {provider === "github" ? "GitHub" : "Google"} sign-in…
         </p>
@@ -83,7 +87,10 @@ export default function DesktopAuthPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
-          <Loader2 className="h-7 w-7 animate-spin text-[#6366F1]" strokeWidth={1.5} />
+          <Loader2
+            className="h-7 w-7 animate-spin text-[#6366F1]"
+            strokeWidth={1.5}
+          />
         </div>
       }
     >
