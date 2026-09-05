@@ -7,6 +7,11 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import BfcacheGuard from "@/components/auth/BfcacheGuard";
 
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 function SSOCallbackInner() {
   const { loaded } = useClerk();
   const { signIn } = useSignIn();
@@ -19,14 +24,15 @@ function SSOCallbackInner() {
     if (!loaded || hasRun.current) return;
     hasRun.current = true;
 
+    const source = window.sessionStorage.getItem("timelens_source") || getCookie("timelens_source");
     const isExtension =
       typeof window !== "undefined" &&
-      window.sessionStorage.getItem("timelens_source") === "extension";
+      (source === "extension" || source === "desktop");
 
     (async () => {
       try {
         const provider = (typeof window !== "undefined"
-          ? window.sessionStorage.getItem("timelens_oauth")
+          ? (window.sessionStorage.getItem("timelens_oauth") || getCookie("timelens_oauth"))
           : null) as "google" | "github" | null;
 
         if (!provider) throw new Error("Missing OAuth provider.");
@@ -77,7 +83,7 @@ function SSOCallbackInner() {
         if (isExtension) {
           const redirectUrl = window.sessionStorage.getItem(
             "timelens_extension_redirect"
-          );
+          ) || getCookie("timelens_extension_redirect");
           if (!redirectUrl) throw new Error("Missing extension redirect URL.");
 
           const API_BASE =
@@ -120,6 +126,9 @@ function SSOCallbackInner() {
         window.sessionStorage.removeItem("timelens_oauth");
         window.sessionStorage.removeItem("timelens_extension_redirect");
         window.sessionStorage.removeItem("timelens_source");
+        document.cookie = "timelens_oauth=;path=/;max-age=0";
+        document.cookie = "timelens_extension_redirect=;path=/;max-age=0";
+        document.cookie = "timelens_source=;path=/;max-age=0";
       }
     })();
   }, [loaded, signIn, signUp, oauthSignIn, router]);

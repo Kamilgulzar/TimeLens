@@ -5,6 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { useClerk, useSignIn } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 
+function setDesktopCookie(name: string, value: string) {
+  document.cookie = `${name}=${encodeURIComponent(value)};path=/;max-age=600;SameSite=Lax`;
+}
+
 function DesktopAuthInner() {
   const searchParams = useSearchParams();
   const { loaded } = useClerk();
@@ -28,6 +32,10 @@ function DesktopAuthInner() {
     sessionStorage.setItem("timelens_oauth", provider);
     sessionStorage.setItem("timelens_extension_redirect", "timelens://auth");
 
+    setDesktopCookie("timelens_source", "desktop");
+    setDesktopCookie("timelens_oauth", provider);
+    setDesktopCookie("timelens_extension_redirect", "timelens://auth");
+
     signIn
       .create({
         strategy,
@@ -43,6 +51,11 @@ function DesktopAuthInner() {
           setError("Failed to start OAuth: no redirect URL returned.");
           return;
         }
+
+        setDesktopCookie("timelens_source", "desktop");
+        setDesktopCookie("timelens_oauth", provider);
+        setDesktopCookie("timelens_extension_redirect", "timelens://auth");
+
         window.location.href = url.toString();
       })
       .catch((err: unknown) => {
