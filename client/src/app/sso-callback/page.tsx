@@ -1,85 +1,49 @@
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { useClerk, useSession } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import BfcacheGuard from "@/components/auth/BfcacheGuard";
 
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
 function readMarker(key: string): string | null {
+  if (typeof window === "undefined") return null;
   const urlVal = new URLSearchParams(window.location.search).get(key);
   if (urlVal) return urlVal;
   const ssVal = window.sessionStorage.getItem(key);
   if (ssVal) return ssVal;
-  return getCookie(key);
+  const match = document.cookie.match(new RegExp("(^| )" + key + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
 }
 
 function SSOCallbackInner() {
   const { loaded } = useClerk();
-  const { signIn } = useSignIn();
-  const { signUp } = useSignUp();
+  const { session } = useSession();
   const { oauthSignIn } = useAuth();
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const hasRun = useRef(false);
 
   useEffect(() => {
-    if (!loaded || hasRun.current) return;
+    if (!loaded || hasRun.current || !session) return;
     hasRun.current = true;
 
     const source = readMarker("timelens_source");
-    const isExtension =
-      typeof window !== "undefined" &&
-      (source === "extension" || source === "desktop");
+    const isExtension = source === "extension" || source === "desktop";
 
     (async () => {
       try {
         const provider = readMarker("timelens_oauth") as "google" | "github" | null;
-
         if (!provider) throw new Error("Missing OAuth provider.");
 
-        let email: string | null = null;
-        let firstName: string | undefined;
-        let lastName: string | undefined;
-        let avatar: string | undefined;
+        const email = session.user.primaryEmailAddress?.emailAddress
+          || session.user.emailAddresses?.[0]?.emailAddress;
+        if (!email) throw new Error("No email found in session.");
 
-        const MAX_ATTEMPTS = 40;
-        for (let i = 0; i < MAX_ATTEMPTS; i++) {
-          if (signIn.status === "complete" && signIn.identifier) {
-            email = signIn.identifier;
-            firstName = signIn.userData?.firstName;
-            lastName = signIn.userData?.lastName;
-            avatar = signIn.userData?.imageUrl;
-            break;
-          }
-
-          if (!email && signIn.isTransferable) {
-            const res = await signUp.create({ transfer: true });
-            if (res.error) throw res.error;
-            if (signUp.emailAddress) {
-              email = signUp.emailAddress;
-              firstName = firstName ?? signUp.firstName ?? undefined;
-              lastName = lastName ?? signUp.lastName ?? undefined;
-            }
-            break;
-          }
-
-          await new Promise((r) => setTimeout(r, 200));
-        }
-
-        if (!email && signIn.status === "complete" && signIn.identifier) {
-          email = signIn.identifier;
-          firstName = signIn.userData?.firstName;
-          lastName = signIn.userData?.lastName;
-          avatar = signIn.userData?.imageUrl;
-        }
-
-        if (!email) throw new Error("OAuth flow did not produce an email.");
+        const firstName = session.user.firstName ?? undefined;
+        const lastName = session.user.lastName ?? undefined;
+        const avatar = session.user.imageUrl ?? undefined;
 
         if (isExtension) {
           const redirectUrl = readMarker("timelens_redirect");
@@ -110,11 +74,11 @@ function SSOCallbackInner() {
           lastName,
           avatar,
         });
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[sso-callback] Error:", msg);
         if (isExtension) {
-          document.title = "OAuth Error";
-          document.body.innerHTML =
-            '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#ef4444"><p>OAuth failed. Close this window and try again.</p></div>';
+          setError(msg);
           return;
         }
         router.replace("/login?oauth=error");
@@ -122,12 +86,25 @@ function SSOCallbackInner() {
         window.sessionStorage.removeItem("timelens_oauth");
         window.sessionStorage.removeItem("timelens_extension_redirect");
         window.sessionStorage.removeItem("timelens_source");
-        document.cookie = "timelens_oauth=;path=/;max-age=0";
-        document.cookie = "timelens_extension_redirect=;path=/;max-age=0";
         document.cookie = "timelens_source=;path=/;max-age=0";
+        document.cookie = "timelens_oauth=;path=/;max-age=0";
+        document.cookie = "timelens_redirect=;path=/;max-age=0";
       }
     })();
-  }, [loaded, signIn, signUp, oauthSignIn, router]);
+  }, [loaded, session, oauthSignIn, router]);
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
+          <p className="text-[14px] text-[#EF4444]">OAuth failed: {error}</p>
+          <p className="text-[12px] text-[#98A2B3]">
+            Close this window and try again from the desktop app.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFC] dark:bg-[#0C0C10]">
