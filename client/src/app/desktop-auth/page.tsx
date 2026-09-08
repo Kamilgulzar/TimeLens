@@ -5,10 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { useClerk, useSignIn } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 
-function setDesktopCookie(name: string, value: string) {
-  document.cookie = `${name}=${encodeURIComponent(value)};path=/;max-age=600;SameSite=Lax`;
-}
-
 function DesktopAuthInner() {
   const searchParams = useSearchParams();
   const { loaded } = useClerk();
@@ -28,19 +24,17 @@ function DesktopAuthInner() {
 
     const strategy = provider === "google" ? "oauth_google" : "oauth_github";
 
-    sessionStorage.setItem("timelens_source", "desktop");
-    sessionStorage.setItem("timelens_oauth", provider);
-    sessionStorage.setItem("timelens_extension_redirect", "timelens://auth");
-
-    setDesktopCookie("timelens_source", "desktop");
-    setDesktopCookie("timelens_oauth", provider);
-    setDesktopCookie("timelens_extension_redirect", "timelens://auth");
+    const callbackParams = new URLSearchParams({
+      timelens_source: "desktop",
+      timelens_oauth: provider,
+      timelens_redirect: "timelens://auth",
+    });
 
     signIn
       .create({
         strategy,
-        redirectUrl: "/sso-callback",
-        actionCompleteRedirectUrl: "/sso-callback",
+        redirectUrl: `/sso-callback?${callbackParams.toString()}`,
+        actionCompleteRedirectUrl: `/sso-callback?${callbackParams.toString()}`,
       })
       .then((res) => {
         if (res.error) throw res.error;
@@ -51,11 +45,6 @@ function DesktopAuthInner() {
           setError("Failed to start OAuth: no redirect URL returned.");
           return;
         }
-
-        setDesktopCookie("timelens_source", "desktop");
-        setDesktopCookie("timelens_oauth", provider);
-        setDesktopCookie("timelens_extension_redirect", "timelens://auth");
-
         window.location.href = url.toString();
       })
       .catch((err: unknown) => {

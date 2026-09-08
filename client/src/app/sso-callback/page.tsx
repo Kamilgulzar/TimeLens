@@ -12,6 +12,14 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+function readMarker(key: string): string | null {
+  const urlVal = new URLSearchParams(window.location.search).get(key);
+  if (urlVal) return urlVal;
+  const ssVal = window.sessionStorage.getItem(key);
+  if (ssVal) return ssVal;
+  return getCookie(key);
+}
+
 function SSOCallbackInner() {
   const { loaded } = useClerk();
   const { signIn } = useSignIn();
@@ -24,27 +32,23 @@ function SSOCallbackInner() {
     if (!loaded || hasRun.current) return;
     hasRun.current = true;
 
-    const source = window.sessionStorage.getItem("timelens_source") || getCookie("timelens_source");
+    const source = readMarker("timelens_source");
     const isExtension =
       typeof window !== "undefined" &&
       (source === "extension" || source === "desktop");
 
     (async () => {
       try {
-        const provider = (typeof window !== "undefined"
-          ? (window.sessionStorage.getItem("timelens_oauth") || getCookie("timelens_oauth"))
-          : null) as "google" | "github" | null;
+        const provider = readMarker("timelens_oauth") as "google" | "github" | null;
 
         if (!provider) throw new Error("Missing OAuth provider.");
 
-        // Clerk may need a tick to finalize the sign-in after redirect.
-        // Poll signIn.status until it's "complete" or we time out.
         let email: string | null = null;
         let firstName: string | undefined;
         let lastName: string | undefined;
         let avatar: string | undefined;
 
-        const MAX_ATTEMPTS = 20;
+        const MAX_ATTEMPTS = 40;
         for (let i = 0; i < MAX_ATTEMPTS; i++) {
           if (signIn.status === "complete" && signIn.identifier) {
             email = signIn.identifier;
@@ -54,7 +58,6 @@ function SSOCallbackInner() {
             break;
           }
 
-          // Try transfer if sign-in is transferable.
           if (!email && signIn.isTransferable) {
             const res = await signUp.create({ transfer: true });
             if (res.error) throw res.error;
@@ -66,11 +69,9 @@ function SSOCallbackInner() {
             break;
           }
 
-          // Wait 150ms for Clerk to settle.
-          await new Promise((r) => setTimeout(r, 150));
+          await new Promise((r) => setTimeout(r, 200));
         }
 
-        // One final check after polling.
         if (!email && signIn.status === "complete" && signIn.identifier) {
           email = signIn.identifier;
           firstName = signIn.userData?.firstName;
@@ -81,10 +82,8 @@ function SSOCallbackInner() {
         if (!email) throw new Error("OAuth flow did not produce an email.");
 
         if (isExtension) {
-          const redirectUrl = window.sessionStorage.getItem(
-            "timelens_extension_redirect"
-          ) || getCookie("timelens_extension_redirect");
-          if (!redirectUrl) throw new Error("Missing extension redirect URL.");
+          const redirectUrl = readMarker("timelens_redirect");
+          if (!redirectUrl) throw new Error("Missing redirect URL.");
 
           const API_BASE =
             process.env.NEXT_PUBLIC_API_URL || "https://server-liart-xi-18.vercel.app/api";
@@ -104,7 +103,6 @@ function SSOCallbackInner() {
           return;
         }
 
-        // Normal web flow: session cookie via /auth/oauth.
         await oauthSignIn({
           provider,
           email,
@@ -114,8 +112,6 @@ function SSOCallbackInner() {
         });
       } catch {
         if (isExtension) {
-          // For extension flow, show error in-page instead of redirecting
-          // (redirecting inside launchWebAuthFlow breaks the flow).
           document.title = "OAuth Error";
           document.body.innerHTML =
             '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#ef4444"><p>OAuth failed. Close this window and try again.</p></div>';
