@@ -34,6 +34,7 @@ function DesktopAuthInner() {
       .create({
         strategy,
         redirectUrl: `/sso-callback?${callbackParams.toString()}`,
+        actionCompleteRedirectUrl: `/sso-callback?${callbackParams.toString()}`,
       })
       .then((res) => {
         if (res.error) throw res.error;

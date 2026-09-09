@@ -26,19 +26,23 @@ function SSOCallbackInner() {
   const hasRun = useRef(false);
 
   useEffect(() => {
+    console.log("[sso-callback] effect fired:", { loaded, hasRun: hasRun.current, hasSession: !!session });
     if (!loaded || hasRun.current || !session) return;
     hasRun.current = true;
 
     const source = readMarker("timelens_source");
     const isExtension = source === "extension" || source === "desktop";
+    console.log("[sso-callback] source:", source, "isExtension:", isExtension);
 
     (async () => {
       try {
         const provider = readMarker("timelens_oauth") as "google" | "github" | null;
+        console.log("[sso-callback] provider:", provider);
         if (!provider) throw new Error("Missing OAuth provider.");
 
         const email = session.user.primaryEmailAddress?.emailAddress
           || session.user.emailAddresses?.[0]?.emailAddress;
+        console.log("[sso-callback] email:", email);
         if (!email) throw new Error("No email found in session.");
 
         const firstName = session.user.firstName ?? undefined;
@@ -47,23 +51,31 @@ function SSOCallbackInner() {
 
         if (isExtension) {
           const redirectUrl = readMarker("timelens_redirect");
+          console.log("[sso-callback] redirectUrl:", redirectUrl);
           if (!redirectUrl) throw new Error("Missing redirect URL.");
 
           const API_BASE =
             process.env.NEXT_PUBLIC_API_URL || "https://server-liart-xi-18.vercel.app/api";
-          const res = await fetch(`${API_BASE}/auth/extension-oauth`, {
+          const url = `${API_BASE}/auth/extension-oauth`;
+          const body = JSON.stringify({ provider, email, firstName, lastName, avatar });
+          console.log("[sso-callback] calling API:", url, body);
+          const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ provider, email, firstName, lastName, avatar }),
+            body,
           });
+          console.log("[sso-callback] API response status:", res.status);
           if (!res.ok) {
-            const body = await res.json().catch(() => null);
-            throw new Error(body?.error ?? `Server error ${res.status}`);
+            const errBody = await res.json().catch(() => null);
+            console.error("[sso-callback] API error body:", errBody);
+            throw new Error(errBody?.error ?? `Server error ${res.status}`);
           }
           const { token, user } = await res.json();
+          console.log("[sso-callback] got token:", !!token, "user:", !!user);
 
-          const userParam = encodeURIComponent(JSON.stringify(user));
-          window.location.href = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${userParam}`;
+          const deepLinkUrl = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}`;
+          console.log("[sso-callback] redirecting to:", deepLinkUrl);
+          window.location.href = deepLinkUrl;
           return;
         }
 
