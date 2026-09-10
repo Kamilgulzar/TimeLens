@@ -26,23 +26,19 @@ function SSOCallbackInner() {
   const hasRun = useRef(false);
 
   useEffect(() => {
-    console.log("[sso-callback] effect fired:", { loaded, hasRun: hasRun.current, hasSession: !!session });
     if (!loaded || hasRun.current || !session) return;
     hasRun.current = true;
 
     const source = readMarker("timelens_source");
     const isExtension = source === "extension" || source === "desktop";
-    console.log("[sso-callback] source:", source, "isExtension:", isExtension);
 
     (async () => {
       try {
         const provider = readMarker("timelens_oauth") as "google" | "github" | null;
-        console.log("[sso-callback] provider:", provider);
         if (!provider) throw new Error("Missing OAuth provider.");
 
         const email = session.user.primaryEmailAddress?.emailAddress
           || session.user.emailAddresses?.[0]?.emailAddress;
-        console.log("[sso-callback] email:", email);
         if (!email) throw new Error("No email found in session.");
 
         const firstName = session.user.firstName ?? undefined;
@@ -51,30 +47,23 @@ function SSOCallbackInner() {
 
         if (isExtension) {
           const redirectUrl = readMarker("timelens_redirect");
-          console.log("[sso-callback] redirectUrl:", redirectUrl);
           if (!redirectUrl) throw new Error("Missing redirect URL.");
 
           const API_BASE =
             process.env.NEXT_PUBLIC_API_URL || "https://server-liart-xi-18.vercel.app/api";
-          const url = `${API_BASE}/auth/extension-oauth`;
-          const body = JSON.stringify({ provider, email, firstName, lastName, avatar });
-          console.log("[sso-callback] calling API:", url, body);
-          const res = await fetch(url, {
+          const res = await fetch(`${API_BASE}/auth/extension-oauth`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body,
+            body: JSON.stringify({ provider, email, firstName, lastName, avatar }),
           });
-          console.log("[sso-callback] API response status:", res.status);
           if (!res.ok) {
-            const errBody = await res.json().catch(() => null);
-            console.error("[sso-callback] API error body:", errBody);
-            throw new Error(errBody?.error ?? `Server error ${res.status}`);
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.error ?? `Server error ${res.status}`);
           }
           const { token, user } = await res.json();
-          console.log("[sso-callback] got token:", !!token, "user:", !!user);
 
-          const deepLinkUrl = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}`;
-          console.log("[sso-callback] redirecting to:", deepLinkUrl);
+          const userParam = encodeURIComponent(JSON.stringify(user));
+          const deepLinkUrl = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${userParam}`;
           window.location.href = deepLinkUrl;
           return;
         }
@@ -97,6 +86,7 @@ function SSOCallbackInner() {
       } finally {
         window.sessionStorage.removeItem("timelens_oauth");
         window.sessionStorage.removeItem("timelens_extension_redirect");
+        window.sessionStorage.removeItem("timelens_redirect");
         window.sessionStorage.removeItem("timelens_source");
         document.cookie = "timelens_source=;path=/;max-age=0";
         document.cookie = "timelens_oauth=;path=/;max-age=0";
@@ -126,6 +116,12 @@ function SSOCallbackInner() {
         <p className="text-[14px] text-[#667085] dark:text-[#98A2B3]">
           Finishing sign in…
         </p>
+        <div className="text-[11px] text-[#98A2B3] mt-4 max-w-sm text-center space-y-1">
+          <p>loaded: {String(loaded)} | session: {String(!!session)}</p>
+          <p>source: {readMarker("timelens_source") ?? "null"}</p>
+          <p>oauth: {readMarker("timelens_oauth") ?? "null"}</p>
+          <p>redirect: {readMarker("timelens_redirect") ?? "null"}</p>
+        </div>
       </div>
     </div>
   );

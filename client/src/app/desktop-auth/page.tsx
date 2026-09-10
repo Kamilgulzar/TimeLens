@@ -24,17 +24,15 @@ function DesktopAuthInner() {
 
     const strategy = provider === "google" ? "oauth_google" : "oauth_github";
 
-    const callbackParams = new URLSearchParams({
-      timelens_source: "desktop",
-      timelens_oauth: provider,
-      timelens_redirect: "timelens://auth",
-    });
+    window.sessionStorage.setItem("timelens_source", "desktop");
+    window.sessionStorage.setItem("timelens_oauth", provider);
+    window.sessionStorage.setItem("timelens_redirect", "timelens://auth");
 
     signIn
       .create({
         strategy,
-        redirectUrl: `/sso-callback?${callbackParams.toString()}`,
-        actionCompleteRedirectUrl: `/sso-callback?${callbackParams.toString()}`,
+        redirectUrl: "/sso-callback",
+        actionCompleteRedirectUrl: "/sso-callback",
       })
       .then((res) => {
         if (res.error) throw res.error;
