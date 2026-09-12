@@ -62,6 +62,7 @@ function SSOCallbackInner() {
 
     const source = readMarker("timelens_source");
     const isExtension = source === "extension" || source === "desktop";
+    console.log("[OAuth] Phase 2 running, source:", source, "isExtension:", isExtension);
 
     (async () => {
       try {
@@ -69,11 +70,13 @@ function SSOCallbackInner() {
           | "google"
           | "github"
           | null;
+        console.log("[OAuth] provider:", provider);
         if (!provider) throw new Error("Missing OAuth provider.");
 
         const email =
           session.user.primaryEmailAddress?.emailAddress ||
           session.user.emailAddresses?.[0]?.emailAddress;
+        console.log("[OAuth] email:", email);
         if (!email) throw new Error("No email found in session.");
 
         const firstName = session.user.firstName ?? undefined;
@@ -82,13 +85,14 @@ function SSOCallbackInner() {
 
         if (isExtension) {
           const redirectUrl = readMarker("timelens_redirect");
+          console.log("[OAuth] redirectUrl:", redirectUrl);
           if (!redirectUrl) throw new Error("Missing redirect URL.");
 
           const API_BASE =
             process.env.NEXT_PUBLIC_API_URL ||
             "https://server-liart-xi-18.vercel.app/api";
 
-          console.log("[OAuth] Calling extension-oauth");
+          console.log("[OAuth] Calling extension-oauth at", `${API_BASE}/auth/extension-oauth`);
           const res = await fetch(`${API_BASE}/auth/extension-oauth`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -101,17 +105,20 @@ function SSOCallbackInner() {
             }),
           });
 
+          console.log("[OAuth] Response status:", res.status);
+
           if (!res.ok) {
             const body = await res.json().catch(() => null);
             throw new Error(body?.error ?? `Server error ${res.status}`);
           }
 
           const { token, user } = await res.json();
-          console.log("[OAuth] JWT received, redirecting to desktop");
+          console.log("[OAuth] JWT received, building redirect URL");
 
           const userParam = encodeURIComponent(JSON.stringify(user));
           const url = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${userParam}`;
           setDeepLinkUrl(url);
+          console.log("[OAuth] Attempting redirect to:", url.substring(0, 60) + "...");
           window.location.href = url;
           return;
         }
@@ -179,6 +186,14 @@ function SSOCallbackInner() {
             ? "Authentication successful. Returning to TimeLens…"
             : "Signing you into TimeLens…"}
         </p>
+        {deepLinkUrl && (
+          <a
+            href={deepLinkUrl}
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-[10px] bg-[#6366F1] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#4f46e5]"
+          >
+            Open TimeLens
+          </a>
+        )}
       </div>
     </div>
   );
