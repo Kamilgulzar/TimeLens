@@ -119,8 +119,9 @@ function SSOCallbackInner() {
           const url = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${userParam}`;
           setDeepLinkUrl(url);
           console.log("[OAuth] Attempting redirect to:", url.substring(0, 60) + "...");
+          await clerk.signOut();
+          console.log("[OAuth] Signed out of Clerk, redirecting to desktop");
           window.location.href = url;
-          setTimeout(() => clerk.signOut(), 2000);
           return;
         }
 
@@ -147,10 +148,6 @@ function SSOCallbackInner() {
         document.cookie = "timelens_source=;path=/;max-age=0";
         document.cookie = "timelens_oauth=;path=/;max-age=0";
         document.cookie = "timelens_redirect=;path=/;max-age=0";
-
-        if (isExtension) {
-          clerk.signOut();
-        }
       }
     })();
   }, [clerk, session, oauthSignIn, router]);
