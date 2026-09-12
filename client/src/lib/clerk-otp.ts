@@ -24,11 +24,12 @@ import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
  * preserved.
  */
 export function useClerkOtp() {
-  const { loaded } = useClerk();
+  const clerk = useClerk();
+  const { client } = clerk;
   const { signUp } = useSignUp();
   const { signIn } = useSignIn();
 
-  const isLoaded = loaded && !!signUp && !!signIn;
+  const isLoaded = clerk.loaded && !!signUp && !!signIn;
 
   function clerkError(error: unknown): string {
     const clerkErr = error as
@@ -109,6 +110,14 @@ export function useClerkOtp() {
     strategy: "oauth_google" | "oauth_github"
   ): Promise<void> {
     if (!signIn) throw new Error("Clerk sign-in is not ready.");
+
+    if (client?.currentSession) {
+      try {
+        await clerk.signOut();
+      } catch {
+        // ignore
+      }
+    }
 
     const res = await signIn.create({
       strategy,
