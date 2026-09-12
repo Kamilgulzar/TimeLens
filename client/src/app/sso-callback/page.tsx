@@ -20,7 +20,7 @@ function readMarker(key: string): string | null {
 }
 
 function SSOCallbackInner() {
-  const { loaded, client } = useClerk();
+  const clerk = useClerk();
   const { session } = useSession();
   const { oauthSignIn } = useAuth();
   const router = useRouter();
@@ -31,7 +31,7 @@ function SSOCallbackInner() {
 
   // ── Phase 1: If created_session_id is in the URL, explicitly set it ──
   useEffect(() => {
-    if (!loaded || !client || sessionBootstrapped.current) return;
+    if (!clerk.loaded || sessionBootstrapped.current) return;
 
     const sessionId = new URLSearchParams(window.location.search).get(
       "created_session_id"
@@ -44,7 +44,7 @@ function SSOCallbackInner() {
     sessionBootstrapped.current = true;
     console.log("[OAuth] Bootstrapping session from created_session_id");
 
-    client
+    clerk
       .setActive({ session: sessionId })
       .then(() => {
         console.log("[OAuth] Session activated");
@@ -53,11 +53,11 @@ function SSOCallbackInner() {
         console.error("[OAuth] setActive failed:", err);
         setError("Failed to establish session. Please try again.");
       });
-  }, [loaded, client]);
+  }, [clerk]);
 
   // ── Phase 2: Once session is available, call backend + redirect ──
   useEffect(() => {
-    if (!loaded || hasRun.current || !session) return;
+    if (!clerk.loaded || hasRun.current || !session) return;
     hasRun.current = true;
 
     const source = readMarker("timelens_source");
@@ -141,7 +141,7 @@ function SSOCallbackInner() {
         document.cookie = "timelens_redirect=;path=/;max-age=0";
       }
     })();
-  }, [loaded, session, oauthSignIn, router]);
+  }, [clerk, session, oauthSignIn, router]);
 
   // ── Error state ──
   if (error) {
