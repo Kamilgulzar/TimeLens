@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import api from "@/lib/api";
 
 export interface User {
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const clerk = useClerk();
 
   useEffect(() => {
     let active = true;
@@ -99,8 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await api.post("/auth/logout");
     } finally {
       setUser(null);
-      // Full page navigation so the session cookie is cleared and the
-      // dashboard auth guard cannot race us to /login.
+      try {
+        await clerk.signOut();
+      } catch {
+        // Clerk session may not exist for email/password users — safe to ignore.
+      }
       window.location.href = "/";
     }
   };
