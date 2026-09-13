@@ -25,7 +25,6 @@ import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
  */
 export function useClerkOtp() {
   const clerk = useClerk();
-  const { client } = clerk;
   const { signUp } = useSignUp();
   const { signIn } = useSignIn();
 
@@ -111,7 +110,7 @@ export function useClerkOtp() {
   ): Promise<void> {
     if (!signIn) throw new Error("Clerk sign-in is not ready.");
 
-    if (client?.currentSession) {
+    if (clerk?.session) {
       try {
         await clerk.signOut();
       } catch {

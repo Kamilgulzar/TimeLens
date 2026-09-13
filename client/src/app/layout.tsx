@@ -22,7 +22,10 @@ export const metadata: Metadata = {
   title: "TimeLens - Productivity Intelligence",
   description: "Understand how you spend your time. Improve focus and build productive habits.",
   icons: {
-    icon: [{ url: "/logo.png", type: "image/png" }],
+    icon: [
+      { url: "/favicon.png", type: "image/png", sizes: "any" },
+      { url: "/logo.png", type: "image/png" },
+    ],
     apple: [{ url: "/logo.png" }],
   },
 };
