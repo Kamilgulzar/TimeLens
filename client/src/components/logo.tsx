@@ -12,8 +12,8 @@ export function Logo({
   className = "",
   variant = "auto",
   alt = "TimeLens",
-  width = 997,
-  height = 697,
+  width = 1272,
+  height = 1237,
 }: LogoProps) {
   return (
     <Image
@@ -22,6 +22,7 @@ export function Logo({
       width={width}
       height={height}
       className={`object-contain select-none ${variant === "onDark" ? "invert" : "dark:invert"} ${className}`}
+      priority
     />
   );
 }

@@ -23,10 +23,12 @@ export const metadata: Metadata = {
   description: "Understand how you spend your time. Improve focus and build productive habits.",
   icons: {
     icon: [
-      { url: "/favicon.png", type: "image/png", sizes: "any" },
-      { url: "/logo.png", type: "image/png" },
+      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon.png", type: "image/png", sizes: "180x180" },
+      { url: "/logo.png", type: "image/png", sizes: "192x192" },
     ],
-    apple: [{ url: "/logo.png" }],
+    apple: [{ url: "/logo.png", sizes: "180x180" }],
   },
 };
 
