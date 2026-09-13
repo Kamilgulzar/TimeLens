@@ -16,7 +16,9 @@ export interface ExtensionStatusView {
   connected: boolean;
   tracked: boolean;
   trackingEnabled: boolean;
+  source: string;
   browser: string;
+  platform: string | null;
   version: string | null;
   lastSeenAt: string | null;
   lastSyncedAt: string | null;
@@ -30,7 +32,9 @@ export const extensionService = {
     body: {
       connected: boolean;
       trackingEnabled: boolean;
+      source?: string;
       browser: string;
+      platform?: string;
       lastSyncedAt?: string;
       version?: string;
     }
@@ -42,7 +46,9 @@ export const extensionService = {
         update: {
           connected: body.connected,
           trackingEnabled: body.trackingEnabled,
+          source: body.source ?? "browser",
           browser: body.browser,
+          platform: body.platform,
           version: body.version ?? undefined,
           lastSeenAt: now,
           lastSyncedAt: body.lastSyncedAt ? new Date(body.lastSyncedAt) : undefined,
@@ -51,7 +57,9 @@ export const extensionService = {
           userId,
           connected: body.connected,
           trackingEnabled: body.trackingEnabled,
+          source: body.source ?? "browser",
           browser: body.browser,
+          platform: body.platform ?? null,
           version: body.version ?? null,
           lastSeenAt: now,
           lastSyncedAt: body.lastSyncedAt ? new Date(body.lastSyncedAt) : null,
@@ -127,7 +135,9 @@ export const extensionService = {
       connected,
       tracked: connected && Boolean(status?.trackingEnabled),
       trackingEnabled: connected && Boolean(status?.trackingEnabled),
+      source: status?.source ?? "browser",
       browser: status?.browser ?? "Chrome",
+      platform: status?.platform ?? null,
       version: status?.version ?? null,
       lastSeenAt: status?.lastSeenAt ? status.lastSeenAt.toISOString() : null,
       lastSyncedAt: status?.lastSyncedAt ? status.lastSyncedAt.toISOString() : null,

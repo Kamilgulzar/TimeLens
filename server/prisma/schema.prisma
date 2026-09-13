@@ -17,6 +17,8 @@ model User {
   providerId  String?     @unique
   avatar      String?
   emailVerifiedAt DateTime?
+  emailVerificationCode   String?
+  emailVerificationExpires DateTime?
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -32,7 +34,9 @@ model ExtensionStatus {
   userId          String    @id
   connected       Boolean   @default(false)
   trackingEnabled Boolean   @default(false)
+  source          String    @default("browser") // "browser" | "desktop"
   browser         String    @default("Chrome")
+  platform        String?   // "windows" | "macos" | "linux" (desktop only)
   version         String?
   lastSeenAt      DateTime?
   lastSyncedAt    DateTime?

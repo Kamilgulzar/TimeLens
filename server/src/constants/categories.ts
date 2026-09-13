@@ -373,3 +373,127 @@ export function classifyDomain(
   }
   return DEFAULT_CATEGORY;
 }
+
+/**
+ * Desktop application -> category rules.
+ * Browsers are classified as "Other" because the browser extension
+ * already tracks website-level activity inside the browser.
+ */
+const DESKTOP_APP_RULES: { category: ActivityCategory; apps: string[] }[] = [
+  {
+    category: "Development",
+    apps: [
+      "Visual Studio Code", "VS Code", "VSCode",
+      "Visual Studio", "VS",
+      "Cursor",
+      "JetBrains", "IntelliJ IDEA", "IntelliJ", "PyCharm", "Android Studio",
+      "WebStorm", "GoLand", "Rider", "CLion", "DataGrip", "RubyMine", "PhpStorm",
+      "Sublime Text", "Atom", "Notepad++", "Vim", "Neovim", "Emacs",
+      "Docker Desktop", "Postman", "Insomnia",
+      "GitHub Desktop", "SourceTree", "Fork",
+      "Windows Terminal", "PowerShell", "CMD",
+      "Hyper", "Warp", "Alacritty",
+    ],
+  },
+  {
+    category: "Work",
+    apps: [
+      "Microsoft Word", "Word",
+      "Microsoft Excel", "Excel",
+      "Microsoft PowerPoint", "PowerPoint",
+      "Microsoft Outlook", "Outlook",
+      "Microsoft OneNote", "OneNote",
+      "Microsoft Access", "Access",
+      "Notion", "Obsidian",
+      "Trello", "Asana", "Monday.com", "Linear", "ClickUp",
+      "Jira", "Confluence",
+      "LibreOffice", "OpenOffice", "WPS Office",
+    ],
+  },
+  {
+    category: "Communication",
+    apps: [
+      "Microsoft Teams", "Teams",
+      "Slack", "Discord",
+      "WhatsApp", "WhatsApp Desktop",
+      "Telegram", "Signal", "Wire",
+      "Zoom", "Skype", "Google Meet", "Webex",
+      "Mailbird", "Thunderbird", "Spark",
+    ],
+  },
+  {
+    category: "Research",
+    apps: [
+      "TradingView",
+      "Zotero", "Mendeley", "EndNote",
+      "Jupyter Notebook", "JupyterLab", "Jupyter",
+      "RStudio",
+    ],
+  },
+  {
+    category: "Design",
+    apps: [
+      "Figma", "Figma Desktop",
+      "Adobe Photoshop", "Photoshop",
+      "Adobe Illustrator", "Illustrator",
+      "Adobe Premiere Pro", "Premiere Pro",
+      "Adobe After Effects", "After Effects",
+      "Adobe InDesign", "InDesign",
+      "Blender", "Cinema 4D", "Maya",
+      "DaVinci Resolve", "Final Cut Pro",
+      "Affinity Designer", "Affinity Photo",
+      "Canva Desktop", "Canva",
+      "Audacity", "FL Studio", "Ableton Live",
+    ],
+  },
+  {
+    category: "Entertainment",
+    apps: [
+      "Spotify", "Apple Music", "YouTube Music",
+      "VLC", "Windows Media Player", "iTunes",
+      "Netflix", "Disney+", "Hulu", "Amazon Prime Video",
+      "Steam", "Epic Games Launcher", "GOG Galaxy",
+      "OBS Studio", "OBS",
+      "Plex", "Kodi",
+    ],
+  },
+  {
+    category: "Other",
+    apps: [
+      "Google Chrome", "Chrome",
+      "Mozilla Firefox", "Firefox",
+      "Microsoft Edge", "Edge",
+      "Safari",
+      "Opera", "Opera GX",
+      "Brave",
+      "Vivaldi",
+      "Arc",
+      "Tor Browser",
+      "Windows Explorer", "File Explorer",
+      "Windows Settings", "Task Manager",
+      "Calculator", "Snipping Tool",
+    ],
+  },
+];
+
+/**
+ * Classify a desktop application name into a category.
+ *
+ * Case-insensitive matching. Falls back to "Other" for unknown apps.
+ */
+export function classifyDesktopApp(appName: string): ActivityCategory {
+  if (!appName) return DEFAULT_CATEGORY;
+
+  const normalized = appName.trim().toLowerCase();
+  if (!normalized) return DEFAULT_CATEGORY;
+
+  for (const rule of DESKTOP_APP_RULES) {
+    for (const app of rule.apps) {
+      if (normalized === app.toLowerCase() || normalized.includes(app.toLowerCase())) {
+        return rule.category;
+      }
+    }
+  }
+
+  return DEFAULT_CATEGORY;
+}

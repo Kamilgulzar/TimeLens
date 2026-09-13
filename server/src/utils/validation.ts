@@ -28,7 +28,31 @@ export const loginSchema = z.object({
 export const extensionLoginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
-  source: z.literal("browser").default("browser"),
+  source: z.enum(["browser", "desktop"]).default("browser"),
+});
+
+export const desktopRegisterSchema = z.object({
+  firstName: z
+    .string()
+    .min(2, "First name must be at least 2 characters")
+    .max(15, "First name must be at most 15 characters"),
+  lastName: z
+    .string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(20, "Last name must be at most 20 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128, "Password must be at most 128 characters")
+    .regex(/[a-z]/, "Password must include a lowercase letter")
+    .regex(/[A-Z]/, "Password must include an uppercase letter")
+    .regex(/\d/, "Password must include a number"),
+});
+
+export const desktopVerifyEmailSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  code: z.string().length(6, "Verification code must be 6 digits"),
 });
 
 export const emailSchema = z.object({
@@ -41,7 +65,8 @@ export const verifyEmailSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  code: z.string().length(6, "Verification code must be 6 digits"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export const oauthSchema = z.object({
@@ -66,6 +91,7 @@ export const activityEventSchema = z.object({
   category: z.enum(ACTIVITY_CATEGORIES),
   startTime: z.string().min(1).max(40),
   endTime: z.string().min(1).max(40),
+  source: z.enum(["browser", "desktop"]).optional().default("browser"),
 });
 
 export const submitActivitiesSchema = z.object({
@@ -75,7 +101,9 @@ export const submitActivitiesSchema = z.object({
 export const extensionHeartbeatSchema = z.object({
   connected: z.boolean().default(true),
   trackingEnabled: z.boolean(),
+  source: z.enum(["browser", "desktop"]).optional().default("browser"),
   browser: z.string().min(1).max(40).default("Chrome"),
+  platform: z.enum(["windows", "macos", "linux"]).optional(),
   version: z.string().min(1).max(40).optional(),
   lastSyncedAt: z.string().min(1).max(40).optional(),
 });
@@ -98,6 +126,8 @@ export type CategoryOverrideInput = z.infer<typeof categoryOverrideSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ExtensionLoginInput = z.infer<typeof extensionLoginSchema>;
+export type DesktopRegisterInput = z.infer<typeof desktopRegisterSchema>;
+export type DesktopVerifyEmailInput = z.infer<typeof desktopVerifyEmailSchema>;
 export type EmailInput = z.infer<typeof emailSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

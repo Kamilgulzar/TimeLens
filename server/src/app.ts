@@ -12,7 +12,7 @@ const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin, such as server-to-server requests.
+      // Allow requests with no origin, such as server-to-server requests
       if (!origin) {
         callback(null, true);
         return;
@@ -26,6 +26,19 @@ app.use(
 
       // Allow the TimeLens Chrome/Edge extension.
       if (origin.startsWith("chrome-extension://")) {
+        callback(null, true);
+        return;
+      }
+
+      // Allow the TimeLens desktop app (Electron dev server).
+      if (origin === "http://localhost:5173" || origin === "http://localhost:5174") {
+        callback(null, true);
+        return;
+      }
+
+      // Allow the TimeLens desktop app (Electron production builds load from file://
+      // which Chromium sends as the literal string "null").
+      if (origin === "null") {
         callback(null, true);
         return;
       }

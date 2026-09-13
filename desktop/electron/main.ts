@@ -6,6 +6,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let tracker: ActiveWindowTracker | null = null;
+let pendingDeepLink: string | null = null;
 
 const isDev = !app.isPackaged;
 const API_URL = isDev
@@ -45,6 +46,14 @@ function createWindow() {
     mainWindow?.show();
     tracker = new ActiveWindowTracker(mainWindow!);
     tracker.start();
+  });
+
+  mainWindow.webContents.once("did-finish-load", () => {
+    if (pendingDeepLink) {
+      const url = pendingDeepLink;
+      pendingDeepLink = null;
+      handleDeepLink(url);
+    }
   });
 
   mainWindow.on("close", (event) => {
@@ -218,22 +227,43 @@ ipcMain.handle("tracking:stop", () => {
   }
 });
 
-// App lifecycle
-// On Windows, force-write the protocol registry entry so that
-// timelens://auth?token=... launches Electron with "." as the app path
-// (instead of treating the URL as the app path itself).
-if (process.platform === "win32") {
+// Deep link handling
+function handleDeepLink(url: string) {
+  console.log("[DeepLink] Received deep link");
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    pendingDeepLink = url;
+    return;
+  }
+
   try {
-    const execSync = require("child_process").execSync;
-    const cmd = `"${process.execPath}" "." "%1"`;
-    // Remove any old stale entry
-    try { execSync(`reg delete "HKCU\\Software\\Classes\\timelens" /f`, { stdio: "ignore" }); } catch {}
-    // Write correct entry: electron.exe "." "%1"
-    try { execSync(`reg add "HKCU\\Software\\Classes\\timelens\\shell\\open\\command" /ve /t REG_SZ /d "${cmd}" /f`, { stdio: "ignore" }); } catch {}
-    try { execSync(`reg add "HKCU\\Software\\Classes\\timelens" /v "URL Protocol" /t REG_SZ /d "" /f`, { stdio: "ignore" }); } catch {}
-  } catch {}
+    const parsed = new URL(url);
+    const token = parsed.searchParams.get("token");
+    const error = parsed.searchParams.get("error");
+
+    if (token) {
+      mainWindow.webContents.send("oauth:token", token);
+    } else if (error) {
+      mainWindow.webContents.send("oauth:error", error);
+    }
+  } catch (err) {
+    console.error("[DeepLink] Invalid URL");
+  }
 }
 
+// macOS: fires when the OS opens a timelens:// link
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  if (url.startsWith("timelens://")) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      handleDeepLink(url);
+    } else {
+      pendingDeepLink = url;
+    }
+  }
+});
+
+// App lifecycle
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -248,53 +278,27 @@ if (!gotLock) {
       handleDeepLink(deepLink);
     }
   });
-}
 
-app.setAsDefaultProtocolClient("timelens");
+  app.whenReady().then(() => {
+    createWindow();
+    createTray();
 
-function handleDeepLink(url: string) {
-  console.log("[DeepLink] Received:", url);
-  try {
-    const parsed = new URL(url);
-    const token = parsed.searchParams.get("token");
-    const error = parsed.searchParams.get("error");
-
-    if (token && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("oauth:token", token);
-    } else if (error && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("oauth:error", error);
+    // Windows: the deep link URL may already be in process.argv from the
+    // protocol handler that launched this instance.
+    const deepLinkArg = process.argv.find((arg) => arg.startsWith("timelens://"));
+    if (deepLinkArg) {
+      pendingDeepLink = deepLinkArg;
     }
-  } catch {}
-}
 
-app.on("open-url", (event, url) => {
-  event.preventDefault();
-  if (url.startsWith("timelens://")) {
-    if (mainWindow) {
-      handleDeepLink(url);
-    } else {
-      app.once("ready", () => handleDeepLink(url));
-    }
-  }
-});
-
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
-
-  const deepLinkArg = process.argv.find((arg) => arg.startsWith("timelens://"));
-  if (deepLinkArg) {
-    handleDeepLink(deepLinkArg);
-  }
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else {
-      mainWindow?.show();
-    }
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      } else {
+        mainWindow?.show();
+      }
+    });
   });
-});
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

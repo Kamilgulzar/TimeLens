@@ -14,4 +14,6 @@ export const env = {
   jwtSecret: required("JWT_SECRET", process.env.JWT_SECRET),
   clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
   isProduction: process.env.NODE_ENV === "production",
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPass: process.env.SMTP_PASS || "",
 };

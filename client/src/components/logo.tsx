@@ -21,7 +21,7 @@ export function Logo({
       alt={alt}
       width={width}
       height={height}
-      className={`object-contain select-none ${variant === "onDark" ? "invert" : "dark:invert"} ${className}`}
+      className={`object-contain select-none ${variant === "onDark" ? "" : "invert dark:invert-0"} ${className}`}
       priority
     />
   );

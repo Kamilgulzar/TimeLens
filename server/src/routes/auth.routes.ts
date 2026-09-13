@@ -11,6 +11,9 @@ router.post("/login", authController.login);
 router.post("/logout", authController.logout);
 
 router.post("/extension-login", authController.extensionLogin);
+router.post("/desktop-register", authController.desktopRegister);
+router.post("/desktop-verify-email", authController.desktopVerifyEmail);
+router.post("/desktop-resend-code", authController.desktopResendCode);
 
 router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password", authController.resetPassword);

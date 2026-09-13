@@ -1,4 +1,4 @@
-import { classifyDomain, CATEGORY_KIND, type ActivityCategory, type CategoryKind } from "../constants/categories";
+import { classifyDomain, classifyDesktopApp, CATEGORY_KIND, type ActivityCategory, type CategoryKind } from "../constants/categories";
 
 /**
  * Centralized activity analytics.
@@ -20,6 +20,7 @@ export interface ActivityRow {
   id: string;
   application: string;
   category: string;
+  source: string;
   startTime: Date;
   endTime: Date;
   duration: number;
@@ -150,7 +151,9 @@ export function summarizeActivities(
   const seriesCategoryMap = new Map<number, Map<ActivityCategory, number>>();
 
   const sessions: SessionView[] = activities.map((a) => {
-    const category = classifyDomain(a.application, overrides);
+    const category = a.source === "desktop"
+      ? classifyDesktopApp(a.application)
+      : classifyDomain(a.application, overrides);
     const kind = kindFor(category);
 
     totalDuration += a.duration;

@@ -2,12 +2,13 @@ import prisma from "../prisma/client";
 import { Prisma } from "@prisma/client";
 import { AppError } from "../utils/errors";
 import { normalizeDomain } from "../lib/domain";
-import { classifyDomain, type ActivityCategory } from "../constants/categories";
+import { classifyDomain, classifyDesktopApp, type ActivityCategory } from "../constants/categories";
 import {
   summarizeActivities,
 } from "./activity-analytics";
 import type { ActivityEventInput } from "../utils/validation";
 
+export const MIN_DURATION_SECONDS = 3;
 export const MAX_DURATION_SECONDS = 24 * 60 * 60; // 24h per session
 const MAX_FUTURE_SKEW_MS = 15 * 60 * 1000; // tolerate small client clock skew
 const SUMMARY_TAKE = 2000;
@@ -25,14 +26,29 @@ interface ValidEvent {
   startTime: Date;
   endTime: Date;
   duration: number;
+  source: "browser" | "desktop";
 }
 
 function toValidEvent(
   event: ActivityEventInput,
   overrides: Record<string, ActivityCategory>
 ): ValidEvent | null {
-  const website = normalizeDomain(event.website);
-  if (!website) return null;
+  const source = event.source || "browser";
+
+  let website: string | null;
+  let category: ActivityCategory;
+
+  if (source === "desktop") {
+    // For desktop apps, use the app name directly (no domain normalization)
+    website = event.website?.trim() || null;
+    if (!website) return null;
+    category = classifyDesktopApp(website);
+  } else {
+    // For browser activities, normalize domain and classify
+    website = normalizeDomain(event.website);
+    if (!website) return null;
+    category = classifyDomain(website, overrides);
+  }
 
   const startTime = new Date(event.startTime);
   const endTime = new Date(event.endTime);
@@ -44,19 +60,19 @@ function toValidEvent(
   if (durationMs <= 0) return null;
 
   const duration = Math.round(durationMs / 1000);
+  if (duration < MIN_DURATION_SECONDS) return null;
   if (duration > MAX_DURATION_SECONDS) return null;
 
   if (startTime.getTime() > Date.now() + MAX_FUTURE_SKEW_MS) return null;
 
   return {
     website,
-    // The server is authoritative for categorization - it always reclassifies
-    // the normalized domain instead of trusting the client-supplied category.
-    category: classifyDomain(website, overrides),
+    category,
     clientEventId: event.clientEventId,
     startTime,
     endTime,
     duration,
+    source,
   };
 }
 
@@ -101,7 +117,7 @@ export const activityService = {
     const existing = await prisma.activity.findMany({
       where: {
         userId,
-        source: "browser",
+        source: { in: ["browser", "desktop"] },
         startTime: { lte: maxEnd },
         endTime: { gte: minStart },
       },
@@ -141,7 +157,7 @@ export const activityService = {
         userId,
         application: event.website,
         category: event.category,
-        source: "browser",
+        source: event.source,
         clientEventId: event.clientEventId,
         startTime: event.startTime,
         endTime: event.endTime,
@@ -180,7 +196,7 @@ export const activityService = {
     return prisma.activity.findMany({
       where: {
         userId,
-        source: "browser",
+        source: { in: ["browser", "desktop"] },
         ...(from || to
           ? { startTime: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
           : {}),
@@ -200,7 +216,7 @@ export const activityService = {
       prisma.activity.findMany({
         where: {
           userId,
-          source: "browser",
+          source: { in: ["browser", "desktop"] },
           ...(from || to
             ? { startTime: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
             : {}),
@@ -209,6 +225,7 @@ export const activityService = {
           id: true,
           application: true,
           category: true,
+          source: true,
           startTime: true,
           endTime: true,
           duration: true,

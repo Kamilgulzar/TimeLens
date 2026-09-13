@@ -12,6 +12,8 @@ import {
   resetPasswordSchema,
   oauthSchema,
   updateProfileSchema,
+  desktopRegisterSchema,
+  desktopVerifyEmailSchema,
 } from "../utils/validation";
 
 export const authController = {
@@ -117,6 +119,42 @@ export const authController = {
       const token = signToken(result.user.id);
 
       res.json({ token, user: result.user });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  // ── Desktop-specific auth ──────────────────────────────────────
+
+  async desktopRegister(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const data = desktopRegisterSchema.parse(req.body);
+      const result = await authService.desktopRegister(data);
+      res.status(201).json({
+        message: "verification required",
+        email: result.email,
+        maskedEmail: result.maskedEmail,
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async desktopVerifyEmail(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const data = desktopVerifyEmailSchema.parse(req.body);
+      const result = await authService.desktopVerifyEmail(data);
+      res.json({ token: result.token, user: result.user });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async desktopResendCode(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const data = emailSchema.parse(req.body);
+      const result = await authService.desktopResendCode(data.email);
+      res.json({ maskedEmail: result.maskedEmail });
     } catch (error) {
       handleError(res, error);
     }

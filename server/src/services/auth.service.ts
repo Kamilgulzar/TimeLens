@@ -1,7 +1,10 @@
+import crypto from "crypto";
 import prisma from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { hashPassword, comparePassword } from "../utils/password";
 import { maskEmail } from "../utils/mask";
+import { signToken } from "./token.service";
+import { emailService } from "./email.service";
 import type {
   RegisterInput,
   LoginInput,
@@ -10,6 +13,8 @@ import type {
   ResetPasswordInput,
   OAuthInput,
   UpdateProfileInput,
+  DesktopRegisterInput,
+  DesktopVerifyEmailInput,
 } from "../utils/validation";
 
 const userSelect = {
@@ -43,6 +48,10 @@ function publicUser(user: {
   };
 }
 
+function generateVerificationCode(): string {
+  return crypto.randomInt(100000, 999999).toString();
+}
+
 export const authService = {
   async register(input: RegisterInput) {
     const email = normalizeEmail(input.email);
@@ -64,7 +73,6 @@ export const authService = {
       },
     });
 
-    // Email verification is handled by Clerk on the client (email_code).
     return { email, maskedEmail: maskEmail(email) };
   },
 
@@ -105,7 +113,30 @@ export const authService = {
   },
 
   async forgotPassword(input: EmailInput) {
-    // Codes are delivered by Clerk on the client; nothing to do server-side.
+    const email = normalizeEmail(input.email);
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return { ok: true };
+    }
+
+    if (!user.emailVerifiedAt) {
+      return { ok: true };
+    }
+
+    const code = generateVerificationCode();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        emailVerificationCode: code,
+        emailVerificationExpires: expires,
+      },
+    });
+
+    await emailService.sendPasswordResetCode(email, code, user.firstName);
+
     return { ok: true };
   },
 
@@ -117,12 +148,27 @@ export const authService = {
       throw new AppError(400, "No account found for this email.");
     }
 
+    if (!user.emailVerificationCode || !user.emailVerificationExpires) {
+      throw new AppError(400, "No verification code found. Please request a new one.");
+    }
+
+    if (user.emailVerificationExpires < new Date()) {
+      throw new AppError(400, "Verification code has expired. Please request a new one.");
+    }
+
+    if (user.emailVerificationCode !== input.code) {
+      throw new AppError(400, "Invalid verification code.");
+    }
+
     const hashedPassword = await hashPassword(input.password);
 
-    // The code was verified by Clerk on the client, so password ownership is proven.
     await prisma.user.update({
       where: { email },
-      data: { password: hashedPassword, emailVerifiedAt: new Date() },
+      data: {
+        password: hashedPassword,
+        emailVerificationCode: null,
+        emailVerificationExpires: null,
+      },
     });
 
     return { ok: true };
@@ -133,8 +179,6 @@ export const authService = {
     const firstName = input.firstName?.trim();
     const lastName = input.lastName?.trim();
 
-    // The identity was verified by Clerk on the client (OAuth provider).
-    // Find or create the user and mark the email as verified.
     const existing = await prisma.user.findUnique({ where: { email } });
 
     if (existing) {
@@ -166,6 +210,105 @@ export const authService = {
     });
 
     return { user: publicUser(created) };
+  },
+
+  // ── Desktop-specific auth (no Clerk dependency) ────────────────
+
+  async desktopRegister(input: DesktopRegisterInput) {
+    const email = normalizeEmail(input.email);
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new AppError(409, "Email already registered.");
+    }
+
+    const hashedPassword = await hashPassword(input.password);
+    const code = generateVerificationCode();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.user.create({
+      data: {
+        firstName: input.firstName.trim(),
+        lastName: input.lastName.trim(),
+        email,
+        password: hashedPassword,
+        provider: "local",
+        emailVerificationCode: code,
+        emailVerificationExpires: expires,
+      },
+    });
+
+    await emailService.sendVerificationCode(email, code, input.firstName.trim());
+
+    return { email, maskedEmail: maskEmail(email) };
+  },
+
+  async desktopVerifyEmail(input: DesktopVerifyEmailInput) {
+    const email = normalizeEmail(input.email);
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      throw new AppError(400, "No account found for this email.");
+    }
+
+    if (user.emailVerifiedAt) {
+      const token = signToken(user.id);
+      return { user: publicUser(user), token };
+    }
+
+    if (!user.emailVerificationCode || !user.emailVerificationExpires) {
+      throw new AppError(400, "No verification code found. Please request a new one.");
+    }
+
+    if (user.emailVerificationExpires < new Date()) {
+      throw new AppError(400, "Verification code has expired. Please request a new one.");
+    }
+
+    if (user.emailVerificationCode !== input.code) {
+      throw new AppError(400, "Invalid verification code.");
+    }
+
+    const verifiedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerificationCode: null,
+        emailVerificationExpires: null,
+      },
+      select: userSelect,
+    });
+
+    const token = signToken(verifiedUser.id);
+
+    return { user: publicUser(verifiedUser), token };
+  },
+
+  async desktopResendCode(email: string) {
+    const normalizedEmail = normalizeEmail(email);
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      throw new AppError(400, "No account found for this email.");
+    }
+
+    if (user.emailVerifiedAt) {
+      throw new AppError(400, "Email is already verified.");
+    }
+
+    const code = generateVerificationCode();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { email: normalizedEmail },
+      data: {
+        emailVerificationCode: code,
+        emailVerificationExpires: expires,
+      },
+    });
+
+    await emailService.sendVerificationCode(normalizedEmail, code, user.firstName);
+
+    return { maskedEmail: maskEmail(normalizedEmail) };
   },
 
   async getMe(userId: string) {
